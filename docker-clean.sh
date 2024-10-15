@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# This script is for development purposes only. It cleans up all the Docker resources
+
 docker system prune -a -f --volumes
 docker stop $(docker ps -aq)
 docker rm $(docker ps -aq)
