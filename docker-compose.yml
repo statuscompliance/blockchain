@@ -1,0 +1,8 @@
+services:
+  ledger:
+    restart: always
+    container_name: ledger
+    build:
+      context: .
+      dockerfile: Dockerfile
+    privileged: true
