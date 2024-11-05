@@ -1,28 +1,34 @@
 function getPropertyValue(obj = {}) {
-    var obj = msg.payload || null;
+    // Obtener el array de objetos del mensaje
+    var array = msg.payload;
 
-            // Obtener la key del config o del mensaje
-            let propertyToGet =
-                msg.req &&
-                msg.req.body &&
-                msg.req.body.propertyToGet !== undefined
-                    ? msg.req.body.propertyToGet
-                    : config.propertyToGet;
+    // Obtener key y keyValue del config o del mensaje
+    let key =
+        msg.req && msg.req.body && msg.req.body.key !== undefined
+            ? msg.req.body.key
+            : config.key;
+    let keyValue =
+        msg.req && msg.req.body && msg.req.body.keyValue !== undefined
+            ? msg.req.body.keyValue
+            : config.keyValue;
 
-            msg.payload = msg.array;
-            // Verificar si obj es un objeto y key está definido
-            if (typeof obj !== "object" || obj === null) {
-                msg.value = null;
-                node.send(msg);
-            } else {
-                if (!propertyToGet) {
-                    node.error("Key must be defined");
-                    return;
-                }
+    // Verificar si array, key y keyValue están definidos
+    if (!Array.isArray(array)) {
+        node.error("Payload must be an array");
+        return;
+    }
+    if (!key || !keyValue) {
+        node.error("Key and keyValue must be defined");
+        return;
+    }
 
-                // Obtener el valor de la propiedad especificada
-                var value = obj[propertyToGet] || obj.propertyToGet;
+    // Buscar el objeto que tenga la propiedad con el valor especificado
+    var foundObject = array.find((obj) => obj[key] === keyValue);
 
-                // Asignar el valor al payload del mensaje
-                msg.value = value !== undefined ? value : null;
+    // Asignar el objeto encontrado al payload del mensaje
+    msg.payload = foundObject || null;
+    msg.array = array;
+
+    // Enviar el mensaje al siguiente nodo
+    node.send(msg);
 }
