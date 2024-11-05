@@ -7,23 +7,21 @@ import { transformFunction } from './utils/transforms.ts';
  * == START OF TESTS ==
  */
 
-const outputPath = join(import.meta.dirname, "output");
+const outputPath = join(import.meta.dirname, 'output');
 await mkdir(outputPath, { recursive: true });
 
-for await (const file of await readdir(join(import.meta.dirname, "tests"))) {
+for await (const file of await readdir(join(import.meta.dirname, 'tests'))) {
   const targetAst = getBaseChaincodeAST();
-  const sourceAst = fileToAST(join(import.meta.dirname, "tests", file));
+  const sourceAst = fileToAST(join(import.meta.dirname, 'tests', file));
 
-  for (const func of sourceAst.getFunctions()) {
-    transformFunction(func, targetAst);
+  for (const function_ of sourceAst.getFunctions()) {
+    transformFunction(function_, targetAst);
   }
 
   await writeASTToFile(targetAst, join(outputPath, file));
 }
 
-
-
 /**
  * Writes base chaincode for testing purposes
  */
-await writeASTToFile(getBaseChaincodeAST(), join(outputPath, "chaincode.ts"));
+await writeASTToFile(getBaseChaincodeAST(), join(outputPath, 'chaincode.ts'));

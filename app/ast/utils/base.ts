@@ -1,4 +1,4 @@
-import { 
+import {
   ArrayLiteralExpression,
   ClassDeclaration,
   MethodDeclaration,
@@ -11,7 +11,7 @@ import {
 } from 'ts-morph';
 import { readFileSync } from 'node:fs';
 
-const _tmp_filename = "_TMP_";
+const _temporary_filename = '_TMP_';
 
 export interface IBaseChaincodeAST {
   source: SourceFile;
@@ -56,63 +56,63 @@ export async function writeASTToFile(ast: IBaseChaincodeAST, path: string) {
  * Factory function for getting default AST for class
  * Generated using TypeScript AST Viewer
  */
-export function getBaseChaincodeAST(className = "Chaincode"): IBaseChaincodeAST {
+export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST {
   const project = getProject(false);
   const source = project.createSourceFile(
-    _tmp_filename
+    _temporary_filename
   );
 
   source.addImportDeclaration({
-    namedImports: ["Contract"],
-    moduleSpecifier: "fabric-contract-api"
+    namedImports: ['Contract'],
+    moduleSpecifier: 'fabric-contract-api'
   });
 
   const classNode = source.addClass({
     name: className,
-    extends: "Contract",
+    extends: 'Contract',
     isExported: false
   });
 
-  const args = classNode.addProperty({
-    name: "_arguments",
+  const arguments_ = classNode.addProperty({
+    name: '_arguments',
     scope: Scope.Private,
-    initializer: "[]"
+    initializer: '[]'
   }).getInitializerIfKindOrThrow(SyntaxKind.ArrayLiteralExpression);
 
   classNode.addProperty({
-    name: "_result",
+    name: '_result',
     scope: Scope.Private
   });
 
   const body = classNode.addMethod({
-    name: "_internalLogic",
+    name: '_internalLogic',
     scope: Scope.Private,
     parameters: [{
-      name: "args",
+      name: 'args',
       isRestParameter: true
     }]
   });
 
   classNode.addProperty({
-    name: "_run",
+    name: '_run',
     scope: Scope.Private,
-    initializer: writer => {
-      writer.write("() =>");
+    initializer: (writer) => {
+      writer.write('() =>');
       writer.block(() => {
-        writer.write("this._result = this._internalLogic(...this._arguments);");
+        writer.write('this._result = this._internalLogic(...this._arguments);');
       });
     }
   });
 
   classNode.addProperty({
-    name: "setArgsAndRun",
+    name: 'setArgsAndRun',
     scope: Scope.Public,
-    initializer: writer => {
-      writer.write("(...args) =>");
+    initializer: (writer) => {
+      writer.write('(...args) =>');
       writer.block(() => {
-        writer.write("this._arguments = args;");
+        writer.write('this._arguments = args;');
         writer.newLine();
-        writer.write("this._run();");
+        writer.write('this._run();');
       });
     }
   });
@@ -123,7 +123,7 @@ export function getBaseChaincodeAST(className = "Chaincode"): IBaseChaincodeAST 
     source,
     class: classNode,
     body,
-    args
+    args: arguments_
   };
 }
 
@@ -132,7 +132,7 @@ export function getBaseChaincodeAST(className = "Chaincode"): IBaseChaincodeAST 
  */
 export function fileToAST(path: string) {
   const project = getProject();
-  const source = project.createSourceFile(_tmp_filename, readFileSync(path).toString());
+  const source = project.createSourceFile(_temporary_filename, readFileSync(path).toString());
   formatAST(source);
 
   return source;
