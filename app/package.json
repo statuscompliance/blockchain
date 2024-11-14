@@ -11,14 +11,14 @@
   },
   "license": "AGPL-3.0-only",
   "devDependencies": {
-    "@eslint/js": "9.13.0",
-    "@stylistic/eslint-plugin": "2.9.0",
-    "@types/node": "22.7.7",
-    "eslint": "9.13.0",
+    "@eslint/js": "9.14.0",
+    "@stylistic/eslint-plugin": "2.10.1",
+    "@types/node": "22.9.0",
+    "eslint": "9.14.0",
     "eslint-plugin-unicorn": "56.0.0",
-    "jiti": "2.3.3",
+    "jiti": "2.4.0",
     "typescript": "5.6.3",
-    "typescript-eslint": "8.11.0"
+    "typescript-eslint": "8.14.0"
   },
   "bin": {
     "blockchainize-nodes": "./bin/blockchainize-nodes.ts"
