@@ -10,7 +10,7 @@ import { transformFunction } from './utils/transforms.ts';
 const outputPath = join(import.meta.dirname, 'output');
 await mkdir(outputPath, { recursive: true });
 
-for await (const file of await readdir(join(import.meta.dirname, 'tests'))) {
+for (const file of await readdir(join(import.meta.dirname, 'tests'))) {
   const targetAst = getBaseChaincodeAST();
   const sourceAst = fileToAST(join(import.meta.dirname, 'tests', file));
 

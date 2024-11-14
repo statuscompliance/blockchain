@@ -32,5 +32,12 @@ export default [
   },
   {
     ignores: ['ast/tests/**', 'ast/output/**']
+  },
+  {
+    name: 'Rules overrides',
+    rules: {
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'unicorn/import-style': 'off'
+    }
   }
 ] as Linter.Config[];

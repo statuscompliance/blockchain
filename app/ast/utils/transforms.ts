@@ -1,5 +1,5 @@
 import { FunctionDeclaration, Statement, SyntaxKind } from 'ts-morph';
-import type { IBaseChaincodeAST } from './base';
+import type { IBaseChaincodeAST } from './base.ts';
 
 /**
  * 1. Replaces NODE-RED calls with their JavaScript equivalent (recursively).
