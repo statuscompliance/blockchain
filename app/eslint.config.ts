@@ -29,5 +29,8 @@ export default [
         extraFileExtensions: ['.vue']
       }
     }
+  },
+  {
+    ignores: ['ast/tests/**', 'ast/output/**']
   }
 ] as Linter.Config[];
