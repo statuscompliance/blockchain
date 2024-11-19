@@ -37,7 +37,14 @@ export default [
     name: 'Rules overrides',
     rules: {
       'no-empty': ['error', { allowEmptyCatch: true }],
-      'unicorn/import-style': 'off'
+      'unicorn/import-style': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      'unicorn/consistent-function-scoping': ['error', { checkArrowFunctions: false }],
+      'unicorn/no-await-expression-member': 'off'
     }
   }
 ] as Linter.Config[];
