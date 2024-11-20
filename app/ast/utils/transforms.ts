@@ -56,7 +56,9 @@ function transformFunctionStatements(statement: Statement): string {
  */
 export function transformFunction(function_: Block, target: IBaseChaincodeAST): void {
   for (const statement of function_.getStatements()) {
-    target.body.addStatements(transformFunctionStatements(statement));
+    if (!statement.wasForgotten()) {
+      target.body.addStatements(transformFunctionStatements(statement));
+    }
   }
 }
 
@@ -250,16 +252,16 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
  * @param suffix - The suffix to append to the file name before the extension
  * @returns The new file path with the suffix added to the file name
  * @example
- * // returns "/path/to/file-suffix.ts" 
+ * // returns "/path/to/file-suffix.ts"
  * addSuffixToFileName("/path/to/file.ts", "-suffix")
  */
 function addSuffixToFileName(filePath: string, suffix: string) {
-  const dir = dirname(filePath);
-  const ext = extname(filePath);
-  const baseName = basename(filePath, ext);
-  const newFileName = `${baseName}-${suffix}${ext}`;
+  const directory = dirname(filePath);
+  const extension = extname(filePath);
+  const baseName = basename(filePath, extension);
+  const newFileName = `${baseName}-${suffix}${extension}`;
 
-  return join(dir, newFileName);
+  return join(directory, newFileName);
 }
 
 /**

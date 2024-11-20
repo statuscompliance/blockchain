@@ -1,8 +1,8 @@
 #!/usr/bin/env -S NODE_NO_WARNINGS=1 node --experimental-strip-types
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
+import { join, parse } from 'node:path';
 import { logger } from '../util/logger.ts';
-import { globSync, mkdirSync, rmSync, renameSync, writeFileSync } from 'node:fs';
+import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync } from 'node:fs';
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
 import { extractInputHandler, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
@@ -86,101 +86,102 @@ mkdirSync(_TMP_PATH, { recursive: true });
 spawnSync('npm', ['pack', '--pack-destination', _TMP_PATH, ...arguments_], { stdio: 'ignore' });
 
 /**
- * Get the package contents
+ * Get the packages contents
  */
-
 for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
-  extract({
-    cwd: _TMP_PATH,
-    file: file,
-    preservePaths: true,
-    sync: true
-  });
+  try {
+    extract({
+      cwd: _TMP_PATH,
+      file,
+      preservePaths: true,
+      sync: true
+    });
 
-  /**
-   * Fetches the nodes JavaScript files from the package.json
-   */
-  const packageJson: PackageJsonWithNodeRedDefinitions = (await import(
-    join(process.cwd(), _TMP_PATH, 'package', 'package.json'),
-    {
-      with: {
-        type: 'json'
+    /**
+     * Fetches the nodes JavaScript files from the package.json
+     */
+    const packageJson: PackageJsonWithNodeRedDefinitions = JSON.parse(
+      readFileSync(join(process.cwd(), _TMP_packagePath, 'package.json'), 'utf8')
+    );
+    const packageName = packageJson.name ?? file.replace('.tgz', '');
+    const outputPath = join(baseOutputPath, packageName);
+    const nodeDefinitions = packageJson['node-red']?.nodes;
+
+    logger.info(`Converting nodes from package ${packageName}...`);
+
+    if (!nodeDefinitions) {
+      logger.error('No nodes found in the provided package');
+      process.exit(1);
+    }
+
+    /**
+     * Conversion process
+     */
+    mkdirSync(_TMP_chaincodeOutputPath, { recursive: true });
+
+    for (const node in nodeDefinitions) {
+      logger.info(`|- [${packageName}] Converting node '${node}'...`);
+
+      try {
+        const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]);
+        const targetAst = getBaseChaincodeAST();
+        const sourceAst = nodeToAST(sourcePath, {
+          module: ModuleKind.CommonJS,
+          useMemory: false
+        });
+        const innerExportsAst = extractModuleExports(sourceAst);
+
+        if (!innerExportsAst) {
+          throw new Error('No module.exports found');
+        }
+
+        renameNode(
+          sourcePath,
+          sourceAst,
+          innerExportsAst,
+          node,
+          nodeDefinitions
+        );
+
+        const contents = extractNodeContents(innerExportsAst);
+        convertRequiresToImports(sourceAst, targetAst);
+        removeREDStatements(contents);
+
+        const inputHandler = extractInputHandler(contents);
+
+        if (!inputHandler) {
+          throw new Error('No input handler found');
+        }
+
+        transformFunction(inputHandler, targetAst);
+        writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, `${node}.ts`));
+      } catch (error) {
+        logger.error(`Converting node ${node}:`, error);
+        process.exit(1);
       }
     }
-  )).default;
-  const packageName = packageJson.name ?? file.replace('.tgz', '');
-  const outputPath = join(baseOutputPath, packageName);
-  const nodeDefinitions = packageJson['node-red']?.nodes;
 
-  logger.info(`Converting nodes from package ${packageName}...`);
+    /**
+     * After all the transformations are done, we pack and prepare the
+     * output artifacts (generated chaincode and the installable nodes package
+     * for Node-RED).
+     */
+    const chaincodeOutputPath = join(outputPath, 'chaincode');
 
-  if (!nodeDefinitions) {
-    logger.error('No nodes found in the provided package');
+    mkdirSync(chaincodeOutputPath, { recursive: true });
+    renameSync(_TMP_chaincodeOutputPath, chaincodeOutputPath);
+    packageJson.name = `${packageName}_blockchainized`;
+    // The arguments passed to JSON.stringify are for pretty printing
+    writeFileSync(join(_TMP_packagePath, 'package.json'), JSON.stringify(packageJson, undefined, 2));
+    spawnSync('npm', ['pack', '--pack-destination', outputPath, `./${_TMP_packagePath}`], { stdio: 'ignore' });
+  } catch (error) {
+    logger.error(`Processing package ${parse(file).name}:`, error);
     process.exit(1);
+  } finally {
+    /**
+     * Perform cleanup after each node conversion
+     */
+    rmSync(_TMP_outputPath, { recursive: true, force: true });
+    rmSync(_TMP_packagePath, { recursive: true, force: true });
   }
-
-  /**
-   * Conversion process
-   */
-  mkdirSync(_TMP_chaincodeOutputPath, { recursive: true });
-
-  for (const node in nodeDefinitions) {
-    logger.info(`|- [${packageName}] Converting node '${node}'...`);
-
-    try {
-      const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]);
-      const targetAst = getBaseChaincodeAST();
-      const sourceAst = nodeToAST(sourcePath, {
-        module: ModuleKind.CommonJS,
-        useMemory: false
-      });
-      const innerExportsAst = extractModuleExports(sourceAst);
-
-      if (!innerExportsAst) {
-        throw new Error('No module.exports found');
-      }
-
-      renameNode(
-        sourcePath,
-        sourceAst,
-        innerExportsAst,
-        node,
-        nodeDefinitions
-      );
-
-      const contents = extractNodeContents(innerExportsAst);
-      convertRequiresToImports(sourceAst, targetAst);
-      removeREDStatements(contents);
-
-      const inputHandler = extractInputHandler(contents);
-
-      if (!inputHandler) {
-        throw new Error('No input handler found');
-      }
-
-      transformFunction(inputHandler, targetAst);
-      writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, `${node}.ts`));
-    } catch (error) {
-      logger.error(`Converting node ${node}:`, error);
-    }
-  }
-
-  const chaincodeOutputPath = join(outputPath, 'chaincode');
-
-  mkdirSync(chaincodeOutputPath, { recursive: true });
-  renameSync(_TMP_chaincodeOutputPath, chaincodeOutputPath);
-
-  /**
-  * Creates the installable package in node-red
-  */
-  packageJson.name = `${packageName}_blockchainized`;
-  // The arguments passed to JSON.stringify are for pretty printing
-  writeFileSync(join(_TMP_packagePath, 'package.json'), JSON.stringify(packageJson, undefined, 2));
-
-  /**
-   * Packs the new package and performs cleanup for the next package provided
-   */
-  spawnSync('npm', ['pack', '--pack-destination', outputPath, `./${_TMP_packagePath}`], { stdio: 'ignore' });
-  rmSync(_TMP_outputPath, { recursive: true, force: true });
-  rmSync(_TMP_packagePath, { recursive: true, force: true });
 }
