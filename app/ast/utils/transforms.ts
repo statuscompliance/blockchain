@@ -1,7 +1,9 @@
+import { basename, dirname, extname, join } from 'node:path';
 import { Block, ModuleKind, Node, SourceFile, Statement, SyntaxKind } from 'ts-morph';
 import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
 import { extractDefinitionFromHTML } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
+import { rmSync } from 'node:fs';
 
 /**
  * 1. Replaces NODE-RED calls with their JavaScript equivalent (recursively).
@@ -242,22 +244,48 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
 }
 
 /**
- * Updates the name of the node, both in the node itself and in the HTML definition.
+ * Adds a suffix to a file name while preserving its directory path and extension.
+ *
+ * @param filePath - The full path of the file including name and extension
+ * @param suffix - The suffix to append to the file name before the extension
+ * @returns The new file path with the suffix added to the file name
+ * @example
+ * // returns "/path/to/file-suffix.ts" 
+ * addSuffixToFileName("/path/to/file.ts", "-suffix")
+ */
+function addSuffixToFileName(filePath: string, suffix: string) {
+  const dir = dirname(filePath);
+  const ext = extname(filePath);
+  const baseName = basename(filePath, ext);
+  const newFileName = `${baseName}-${suffix}${ext}`;
+
+  return join(dir, newFileName);
+}
+
+/**
+ * Updates the name of the node:
+ * - In the node itself
+ * - In the HTML definition of the node.
+ * - In the package.json object
  *
  * @param cjs_exports - The AST of the module.exports from the node (obtained from
  * extractors/extractModuleExports)
  */
-export function updateNodeName(
+export function renameNode(
   sourcePath: string,
   sourceAst: SourceFile,
   cjs_exports: Node,
+  node: string,
+  node_defs: Record<string, string>,
   identifier = 'blockchain'
 ) {
   /**
    * Updates the name in the node itself
    */
   updateNodeNameInRegistration(cjs_exports, identifier);
-  writeASTToFile(sourceAst, sourcePath);
+  writeASTToFile(sourceAst, addSuffixToFileName(sourcePath, identifier));
+  rmSync(sourcePath, { force: true });
+
   /**
    * Updates the HTML definition of the node
    */
@@ -273,6 +301,13 @@ export function updateNodeName(
     originalContents: htmlDefinition.htmlContent,
     originalScript: htmlDefinition.script,
     newScript: newScriptDefinition,
-    htmlPath: nodeHTMLDefinitionPath
+    htmlPath: addSuffixToFileName(nodeHTMLDefinitionPath, identifier)
   });
+  rmSync(nodeHTMLDefinitionPath, { force: true });
+
+  /**
+   * Updates the references in the package.json object
+   */
+  node_defs[`${node}-${identifier}`] = addSuffixToFileName(node_defs[node], identifier);
+  delete node_defs[node];
 }

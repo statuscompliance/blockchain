@@ -6,7 +6,7 @@ import { globSync, mkdirSync, rmSync, renameSync, writeFileSync } from 'node:fs'
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
 import { extractInputHandler, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
-import { convertRequiresToImports, removeREDStatements, transformFunction, updateNodeName } from '../ast/utils/transforms.ts';
+import { convertRequiresToImports, removeREDStatements, renameNode, transformFunction } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
 
@@ -51,7 +51,8 @@ if (arguments_.length === 0 || arguments_[0].trim() === '--help' || arguments_[0
 // APPLICATION ENTRYPOINT STARTS HERE
 
 /**
- * Cleanup temporary files on exit
+ * Cleanup temporary files on exit and handle stacktrace reporting
+ * through custom logger.
  */
 function onExit({ silent = false }, ...arguments__: unknown[]): void {
   if (arguments__.length > 0) {
@@ -124,7 +125,7 @@ for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
   mkdirSync(_TMP_chaincodeOutputPath, { recursive: true });
 
   for (const node in nodeDefinitions) {
-    logger.info(`[${packageName}] Converting node '${node}'...`);
+    logger.info(`|- [${packageName}] Converting node '${node}'...`);
 
     try {
       const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]);
@@ -139,7 +140,13 @@ for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
         throw new Error('No module.exports found');
       }
 
-      updateNodeName(sourcePath, sourceAst, innerExportsAst);
+      renameNode(
+        sourcePath,
+        sourceAst,
+        innerExportsAst,
+        node,
+        nodeDefinitions
+      );
 
       const contents = extractNodeContents(innerExportsAst);
       convertRequiresToImports(sourceAst, targetAst);
@@ -174,5 +181,6 @@ for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
    * Packs the new package and performs cleanup for the next package provided
    */
   spawnSync('npm', ['pack', '--pack-destination', outputPath, `./${_TMP_packagePath}`], { stdio: 'ignore' });
-  onExit({ silent: true });
+  rmSync(_TMP_outputPath, { recursive: true, force: true });
+  rmSync(_TMP_packagePath, { recursive: true, force: true });
 }
