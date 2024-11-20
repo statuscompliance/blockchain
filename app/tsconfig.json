@@ -37,6 +37,7 @@
   "exclude": [
     "node_modules",
     "ast/tests",
-    "ast/output"
+    "ast/output",
+    "*blockchain-conversion*/"
   ]
 }

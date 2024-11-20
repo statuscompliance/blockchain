@@ -9,7 +9,7 @@ import { _temporary_filename } from './shared.ts';
  * -  `node.send(msg)` -> `return msg`
  * -  `node.error("Error message")` -> `throw new Error("Error message")`
  * 2. Maps the statement's text, so it can be written to the function.
- * @param statement
+ * @param statement - The statement to transform
  */
 function transformFunctionStatements(statement: Statement): string {
   for (const stat of statement.getDescendantStatements()) {
