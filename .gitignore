@@ -1,3 +1,9 @@
+# Custom entries
+*blockchain-conversion*
+
+###################################
+# START OF GITIGNORE TEMPLATE
+###################################
 # Logs
 logs
 *.log

@@ -1,5 +1,4 @@
 import {
-  ArrayLiteralExpression,
   ClassDeclaration,
   MethodDeclaration,
   Project,
@@ -9,14 +8,12 @@ import {
   ModuleKind,
   SyntaxKind
 } from 'ts-morph';
-import { readFileSync } from 'node:fs';
-
-const _temporary_filename = '_TMP_';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { _temporary_filename } from './shared.ts';
 
 export interface IBaseChaincodeAST {
   source: SourceFile;
   class: ClassDeclaration;
-  args: ArrayLiteralExpression;
   body: MethodDeclaration;
 }
 
@@ -32,11 +29,12 @@ function formatAST(source: SourceFile) {
 /**
  * Gets a new project instance
  */
-function getProject(useMemory = true) {
+// eslint-disable-next-line unicorn/prefer-module
+export function getProject({ useMemory = true, module = ModuleKind.Preserve } = {}) {
   return new Project({
     compilerOptions: {
       target: ScriptTarget.ESNext,
-      module: ModuleKind.Preserve
+      module: module
     },
     useInMemoryFileSystem: useMemory
   });
@@ -45,11 +43,14 @@ function getProject(useMemory = true) {
 /**
  * Writes the resulting AST to a file
  */
-export async function writeASTToFile(ast: IBaseChaincodeAST, path: string) {
-  formatAST(ast.source);
-  ast.source.move(path, { overwrite: true });
-  await ast.source.save();
-  await ast.source.emit();
+export function writeASTToFile(ast: SourceFile, path: string, emit = false) {
+  formatAST(ast);
+  ast.move(path, { overwrite: true });
+  ast.saveSync();
+
+  if (emit) {
+    ast.emitSync();
+  }
 }
 
 /**
@@ -57,7 +58,7 @@ export async function writeASTToFile(ast: IBaseChaincodeAST, path: string) {
  * Generated using TypeScript AST Viewer
  */
 export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST {
-  const project = getProject(false);
+  const project = getProject({ useMemory: false });
   const source = project.createSourceFile(
     _temporary_filename
   );
@@ -73,11 +74,11 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     isExported: false
   });
 
-  const arguments_ = classNode.addProperty({
-    name: '_arguments',
+  classNode.addProperty({
+    name: '_msg',
     scope: Scope.Private,
-    initializer: '[]'
-  }).getInitializerIfKindOrThrow(SyntaxKind.ArrayLiteralExpression);
+    initializer: '{}'
+  }).getInitializerIfKindOrThrow(SyntaxKind.ObjectLiteralExpression);
 
   classNode.addProperty({
     name: '_result',
@@ -88,8 +89,7 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     name: '_internalLogic',
     scope: Scope.Private,
     parameters: [{
-      name: 'args',
-      isRestParameter: true
+      name: 'msg'
     }]
   });
 
@@ -99,7 +99,7 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     initializer: (writer) => {
       writer.write('() =>');
       writer.block(() => {
-        writer.write('this._result = this._internalLogic(...this._arguments);');
+        writer.write('this._result = this._internalLogic(this._msg);');
       });
     }
   });
@@ -108,9 +108,9 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     name: 'setArgsAndRun',
     scope: Scope.Public,
     initializer: (writer) => {
-      writer.write('(...args) =>');
+      writer.write('(msg) =>');
       writer.block(() => {
-        writer.write('this._arguments = args;');
+        writer.write('this._msg = msg;');
         writer.newLine();
         writer.write('this._run();');
       });
@@ -122,18 +122,36 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
   return {
     source,
     class: classNode,
-    body,
-    args: arguments_
+    body
   };
 }
 
 /**
  * Converts a file into an AST
  */
-export function fileToAST(path: string) {
-  const project = getProject();
+export function nodeToAST(path: string, ...project_arguments: Parameters<typeof getProject>): SourceFile {
+  const project = getProject(...project_arguments);
   const source = project.createSourceFile(_temporary_filename, readFileSync(path).toString());
   formatAST(source);
 
   return source;
+}
+
+/**
+ * Reads the contents of an HTML file
+ */
+export function readHTMLFile(htmlPath: string): string {
+  return readFileSync(htmlPath, 'utf8');
+}
+
+/**
+ * Writes the modified script tags into the HTML file
+ */
+export function writeModifiedHTML({ originalContents, originalScript, newScript, htmlPath }: {
+  originalContents: string;
+  originalScript: string;
+  newScript: string;
+  htmlPath: string;
+}) {
+  writeFileSync(htmlPath, originalContents.replace(originalScript, newScript));
 }

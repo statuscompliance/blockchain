@@ -31,7 +31,7 @@ export default [
     }
   },
   {
-    ignores: ['ast/tests/**', 'ast/output/**']
+    ignores: ['ast/tests/**', 'ast/output/**', '**blockchain-conversion**/']
   },
   {
     name: 'Rules overrides',
