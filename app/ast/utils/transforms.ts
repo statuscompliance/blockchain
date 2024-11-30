@@ -1,9 +1,21 @@
 import { basename, dirname, extname, join } from 'node:path';
-import { Block, ModuleKind, Node, SourceFile, Statement, SyntaxKind } from 'ts-morph';
+import { ModuleKind, Node, PropertyAccessExpression, SourceFile, SyntaxKind } from 'ts-morph';
 import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
 import { extractDefinitionFromHTML } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
 import { rmSync } from 'node:fs';
+
+/**
+ * Replaces a node with a new one, safely checking if the node has a parent
+ * and avoiding errors when replacing nodes with different kinds.
+ */
+function replaceNodeSafely(node: Node, replacement: string) {
+  const parent = node.getParent();
+
+  if (parent) {
+    parent.replaceWithText(replacement);
+  }
+}
 
 /**
  * 1. Replaces NODE-RED calls with their JavaScript equivalent (recursively).
@@ -13,13 +25,7 @@ import { rmSync } from 'node:fs';
  * 2. Maps the statement's text, so it can be written to the function.
  * @param statement - The statement to transform
  */
-function transformFunctionStatements(statement: Statement): string {
-  for (const stat of statement.getDescendantStatements()) {
-    if (!stat.wasForgotten()) {
-      stat.replaceWithText(transformFunctionStatements(stat as Statement));
-    }
-  }
-
+function transformFunctionStatements(statement: Node): void {
   if (statement.isKind(SyntaxKind.ExpressionStatement)) {
     const expression = statement.getExpression().asKind(SyntaxKind.CallExpression);
 
@@ -27,37 +33,31 @@ function transformFunctionStatements(statement: Statement): string {
       const callee = expression.getExpression();
       const arguments_ = expression.getArguments()[0]?.getText();
 
-      try {
-        switch (callee.getText()) {
-          case 'this.error': {
-            return `throw new Error(${arguments_})`;
-          }
-          case 'this.send': {
-            return `return ${arguments_};`;
-          }
+      switch (callee.getText()) {
+        case 'this.error': {
+          replaceNodeSafely(expression, `throw new Error(${arguments_});`);
+          //expression.replaceWithText(`throw new Error(${arguments_});`);
+          return;
         }
-      } catch {} finally {
-        // Removes everything after the throw or return statement, since it's unreachable code
-        for (const sibling of statement.getNextSiblings()) {
-          (sibling as Statement).remove();
+        case 'this.send': {
+          replaceNodeSafely(expression, `return ${arguments_};`);
+          //expression.replaceWithText(`return ${arguments_};`);
+          return;
         }
       }
     }
   }
-
-  return statement.getText();
 }
 
 /**
- * Transform an specific function extracted from a Node-RED's node into a chaincode compatible function.
- *
- * @param func - The AST of the function to transform
- * @param target - The target chaincode class AST, where the transformed function will be written.
+ * Transforms the logic of the node that has been copied over to the chaincode
+ * into chaincode-compatible logic, stripping all node-red specific syntax
  */
-export function transformFunction(function_: Block, target: IBaseChaincodeAST): void {
-  for (const statement of function_.getStatements()) {
-    if (!statement.wasForgotten()) {
-      target.body.addStatements(transformFunctionStatements(statement));
+export function transformLogic(source: Node): void {
+  for (const node of source.getDescendantStatements()) {
+    if (!node.wasForgotten()) {
+      transformLogic(node);
+      transformFunctionStatements(node);
     }
   }
 }
@@ -153,34 +153,36 @@ export function removeREDStatements(source: Node): void {
 
   const nodeThis = source
     .getDescendants()
-    .findLast(node =>
+    .find(node =>
       (
         node.isKind(SyntaxKind.VariableDeclaration)
         || node.isKind(SyntaxKind.VariableDeclarationList)
       ) && node.getText().endsWith('this')
-    )?.asKind(SyntaxKind.VariableDeclaration);
+    )?.asKindOrThrow(SyntaxKind.VariableDeclarationList);
 
   if (nodeThis) {
-    const variableName = nodeThis.getName();
-    const otherReferences = findReferences(source, nodeThis);
-    nodeThis.remove();
+    for (const declaration of nodeThis.getDeclarations()) {
+      const variableName = declaration.getName();
+      const otherReferences = findReferences(source, nodeThis);
+      declaration.remove();
 
-    const nodeReferences = source
-      .getDescendants()
-      .filter(node =>
-        node.isKind(SyntaxKind.Identifier)
-        && node.getText().startsWith(variableName)
-      );
+      const nodeReferences = source
+        .getDescendants()
+        .filter(node =>
+          node.isKind(SyntaxKind.Identifier)
+          && node.getText().startsWith(variableName)
+        );
 
-    for (const reference of [...nodeReferences, ...otherReferences]) {
-      reference.replaceWithText('this');
-    }
+      for (const reference of [...nodeReferences, ...otherReferences]) {
+        reference.replaceWithText('this');
+      }
 
-    for (const node of otherReferences) {
-      const statement = node.getFirstAncestorByKind(SyntaxKind.ExpressionStatement);
+      for (const node of otherReferences) {
+        const statement = node.getFirstAncestorByKind(SyntaxKind.ExpressionStatement);
 
-      if (statement) {
-        statement.remove();
+        if (statement) {
+          statement.remove();
+        }
       }
     }
   }

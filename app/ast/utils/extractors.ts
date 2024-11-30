@@ -1,4 +1,4 @@
-import { BinaryExpression, Block, SourceFile, SyntaxKind, type Node } from 'ts-morph';
+import { BinaryExpression, SourceFile, SyntaxKind, type Node } from 'ts-morph';
 import { readHTMLFile } from './base.ts';
 
 /**
@@ -43,29 +43,53 @@ export function extractNodeContents(cjs_exports: BinaryExpression) {
 }
 
 /**
- * Must be called after removeRedStatements (from transform module)!
+ * Gets the input handler function AST from the node definition.
+ * @param descendants - Descendants of a node
+ * @returns
  */
-export function extractInputHandler(source: Node): Block | undefined {
-  const nodeOn = source
-    .getDescendants()
-    .find(node =>
-      node.isKind(SyntaxKind.CallExpression)
-      && node.getText().startsWith('this.on')
+function getInputHandlers(descendants: Node[]) {
+  return descendants
+    .filter(node =>
+      node.asKind(SyntaxKind.ExpressionStatement)
+        ?.getExpression().asKind(SyntaxKind.CallExpression)
+        && node.getText().startsWith('this.on')
     );
-
-  if (!nodeOn) {
-    throw new Error('No input handler found');
-  }
-
-  const callExpression = nodeOn.asKindOrThrow(SyntaxKind.CallExpression);
-
-  return callExpression
-    .getArguments()[1]
-    ?.asKind(SyntaxKind.FunctionExpression)
-    ?.getBody()
-    ?.asKind(SyntaxKind.Block);
 }
 
+/**
+ * Gets the AST of the code that sorrounds the input handler, placing the input handler
+ * in the last position (so it comes last).
+ */
+export function extractLogic(source: Node) {
+  const descendants = source.asKindOrThrow(SyntaxKind.Block).getStatements();
+  const inputHandlers = getInputHandlers(descendants);
+  const result = descendants.filter(node => !inputHandlers.includes(node));
+
+  for (const handler of inputHandlers) {
+    const callExpression = handler
+      .asKindOrThrow(SyntaxKind.ExpressionStatement)
+      .getExpression()
+      .asKindOrThrow(SyntaxKind.CallExpression);
+    const node = callExpression
+      .getArguments()[1]
+      ?.asKind(SyntaxKind.FunctionExpression)
+      ?.getBody()
+      .asKindOrThrow(SyntaxKind.Block)
+      .getStatements();
+
+    if (!node) {
+      throw new Error('Unexpected syntax found in a input handler');
+    }
+
+    result.push(...node);
+  }
+
+  return result;
+}
+
+/**
+ * Extracts the registration script from the HTML file.
+ */
 export function extractDefinitionFromHTML(htmlPath: string) {
   const htmlContent = readHTMLFile(htmlPath);
   const scriptMatch = /<script.*?>([\s\S]*?)<\/script>/i.exec(htmlContent);
@@ -76,6 +100,6 @@ export function extractDefinitionFromHTML(htmlPath: string) {
 
   return {
     htmlContent,
-    script: scriptMatch.findLast(v => v.includes('RED.nodes.registerType'))
+    script: scriptMatch.find(v => v.includes('RED.nodes.registerType'))
   };
 }

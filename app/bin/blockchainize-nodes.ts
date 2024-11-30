@@ -5,12 +5,13 @@ import { logger } from '../util/logger.ts';
 import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync } from 'node:fs';
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
-import { extractInputHandler, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
-import { convertRequiresToImports, removeREDStatements, renameNode, transformFunction } from '../ast/utils/transforms.ts';
+import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
+import { convertRequiresToImports, removeREDStatements, renameNode, transformLogic } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
 
 const pathIdentifier = 'blockchain-conversion';
+const suffix = 'blockchainized';
 const _TMP_PATH = `_${pathIdentifier}_tmp`;
 const _TMP_outputPath = join(_TMP_PATH, 'output');
 const _TMP_packagePath = join(_TMP_PATH, 'package');
@@ -85,10 +86,17 @@ rmSync(baseOutputPath, { recursive: true, force: true });
 mkdirSync(_TMP_PATH, { recursive: true });
 spawnSync('npm', ['pack', '--pack-destination', _TMP_PATH, ...arguments_], { stdio: 'ignore' });
 
+const packages = globSync(`${_TMP_PATH}/*.tgz`);
+
+if (packages.length === 0) {
+  logger.error('No packages have been found for the provided input');
+  process.exit(1);
+}
+
 /**
  * Get the packages contents
  */
-for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
+for (const file of packages) {
   try {
     extract({
       cwd: _TMP_PATH,
@@ -140,20 +148,18 @@ for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
           sourceAst,
           innerExportsAst,
           node,
-          nodeDefinitions
+          nodeDefinitions,
+          suffix
         );
 
         const contents = extractNodeContents(innerExportsAst);
         convertRequiresToImports(sourceAst, targetAst);
         removeREDStatements(contents);
 
-        const inputHandler = extractInputHandler(contents);
+        const innerLogic = extractLogic(contents);
 
-        if (!inputHandler) {
-          throw new Error('No input handler found');
-        }
-
-        transformFunction(inputHandler, targetAst);
+        targetAst.body.addStatements(innerLogic.map(n => n.getFullText().trim()));
+        transformLogic(targetAst.body.getBodyOrThrow());
         writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, `${node}.ts`));
       } catch (error) {
         logger.error(`Converting node ${node}:`, error);
@@ -166,11 +172,11 @@ for (const file of globSync(`${_TMP_PATH}/*.tgz`)) {
      * output artifacts (generated chaincode and the installable nodes package
      * for Node-RED).
      */
-    const chaincodeOutputPath = join(outputPath, 'chaincode');
+    const chaincodeOutputPath = join(outputPath, 'chaincode').replace('@', '');
 
     mkdirSync(chaincodeOutputPath, { recursive: true });
     renameSync(_TMP_chaincodeOutputPath, chaincodeOutputPath);
-    packageJson.name = `${packageName}_blockchainized`;
+    packageJson.name = `${packageName}_${suffix}`;
     // The arguments passed to JSON.stringify are for pretty printing
     writeFileSync(join(_TMP_packagePath, 'package.json'), JSON.stringify(packageJson, undefined, 2));
     spawnSync('npm', ['pack', '--pack-destination', outputPath, `./${_TMP_packagePath}`], { stdio: 'ignore' });
