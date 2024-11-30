@@ -78,7 +78,19 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     name: '_msg',
     scope: Scope.Private,
     initializer: '{}'
-  }).getInitializerIfKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+  });
+
+  classNode.addProperty({
+    name: '_config',
+    scope: Scope.Private,
+    initializer: '{}'
+  });
+
+  classNode.addProperty({
+    name: "_cleanups",
+    initializer: "new Set<() => void>()",
+    scope: Scope.Private
+});
 
   classNode.addProperty({
     name: '_result',
@@ -90,6 +102,8 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     scope: Scope.Private,
     parameters: [{
       name: 'msg'
+    }, {
+      name: 'config'
     }]
   });
 
@@ -99,18 +113,33 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     initializer: (writer) => {
       writer.write('() =>');
       writer.block(() => {
-        writer.write('this._result = this._internalLogic(this._msg);');
+        writer.write('this._result = this._internalLogic(this._msg, this._config);');
       });
     }
   });
 
   classNode.addProperty({
+    name: 'dispose',
+    scope: Scope.Public,
+    initializer: writer => {
+        writer.write('() =>');
+        writer.block(() => {
+            writer.write('for (const cleanup of this._cleanups)');
+            writer.block(() => {
+                writer.write('cleanup();');
+            });
+        });
+    }
+});
+
+  classNode.addProperty({
     name: 'setArgsAndRun',
     scope: Scope.Public,
     initializer: (writer) => {
-      writer.write('(msg) =>');
+      writer.write('(msg, config) =>');
       writer.block(() => {
         writer.write('this._msg = msg;');
+        writer.write('this._config = config;');
         writer.newLine();
         writer.write('this._run();');
       });
