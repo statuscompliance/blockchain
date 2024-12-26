@@ -86,10 +86,10 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
   });
 
   classNode.addProperty({
-    name: "_cleanups",
-    initializer: "new Set<(removed?: true, done?: () => void) => void>()",
+    name: '_cleanups',
+    initializer: 'new Set<(removed?: true, done?: () => void) => void>()',
     scope: Scope.Private
-});
+  });
 
   classNode.addProperty({
     name: '_result',
@@ -121,16 +121,16 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
   classNode.addProperty({
     name: 'dispose',
     scope: Scope.Public,
-    initializer: writer => {
-        writer.write('() =>');
+    initializer: (writer) => {
+      writer.write('() =>');
+      writer.block(() => {
+        writer.write('for (const cleanup of this._cleanups)');
         writer.block(() => {
-            writer.write('for (const cleanup of this._cleanups)');
-            writer.block(() => {
-                writer.write('cleanup(true, () => {});');
-            });
+          writer.write('cleanup(true, () => {});');
         });
+      });
     }
-});
+  });
 
   classNode.addProperty({
     name: 'setArgsAndRun',

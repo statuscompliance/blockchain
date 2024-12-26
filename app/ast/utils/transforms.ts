@@ -1,7 +1,7 @@
 import { basename, dirname, extname, join } from 'node:path';
-import { ModuleKind, Node, PropertyAccessExpression, SourceFile, SyntaxKind } from 'ts-morph';
+import { CodeBlockWriter, ModuleKind, Node, SourceFile, SyntaxKind } from 'ts-morph';
 import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
-import { extractDefinitionFromHTML } from './extractors.ts';
+import { extractDefinitionFromHTML, extractLogic } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
 import { rmSync } from 'node:fs';
 
@@ -20,8 +20,8 @@ function replaceNodeSafely(node: Node, replacement: string) {
 /**
  * 1. Replaces NODE-RED calls with their JavaScript equivalent (recursively).
  * Examples:
- * -  `node.send(msg)` -> `return msg`
- * -  `node.error("Error message")` -> `throw new Error("Error message")`
+ * -  `this.send(msg)` -> `return msg`
+ * -  `this.error("Error message")` -> `throw new Error("Error message")`
  * 2. Maps the statement's text, so it can be written to the function.
  * @param statement - The statement to transform
  */
@@ -34,14 +34,29 @@ function transformFunctionStatements(statement: Node): void {
       const arguments_ = expression.getArguments()[0]?.getText();
 
       switch (callee.getText()) {
-        case 'this.error': {
-          replaceNodeSafely(expression, `throw new Error(${arguments_});`);
-          //expression.replaceWithText(`throw new Error(${arguments_});`);
-          return;
-        }
+        case 'this.done':
         case 'this.send': {
           replaceNodeSafely(expression, `return ${arguments_};`);
-          //expression.replaceWithText(`return ${arguments_};`);
+          return;
+        }
+        case 'this.error': {
+          replaceNodeSafely(expression, `console.error(${arguments_});`);
+          return;
+        }
+        case 'this.warn': {
+          replaceNodeSafely(expression, `console.warn(${arguments_});`);
+          return;
+        }
+        case 'this.log': {
+          replaceNodeSafely(expression, `console.log(${arguments_});`);
+          return;
+        }
+        case 'this.debug': {
+          replaceNodeSafely(expression, `console.debug(${arguments_});`);
+          return;
+        }
+        case 'this.trace': {
+          replaceNodeSafely(expression, `console.trace(${arguments_});`);
           return;
         }
       }
@@ -60,6 +75,60 @@ export function transformLogic(source: Node): void {
       transformFunctionStatements(node);
     }
   }
+}
+
+/**
+ * Puts the extracted logic with the *extractLogic* function into the chaincode
+ */
+export function addNodeLogicToChaincode(
+  targetAst: IBaseChaincodeAST,
+  extractedLogic: ReturnType<typeof extractLogic>
+): void {
+  const statementsToAppend: (Node | string)[] = [];
+
+  for (const handler in extractedLogic.handlers) {
+    for (const node of extractedLogic.handlers[handler]) {
+      const inner_function_statements = node
+        .asKind(SyntaxKind.FunctionExpression)
+        ?.getBody()
+        .asKindOrThrow(SyntaxKind.Block)
+        .getStatements();
+
+      if (!inner_function_statements) {
+        throw new Error('Unexpected syntax found in a input handler');
+      }
+
+      switch (handler) {
+        case 'input': {
+          statementsToAppend.push(...inner_function_statements);
+          break;
+        }
+        case 'close': {
+          const writer = new CodeBlockWriter();
+
+          writer.write('this._cleanups.add(');
+          writer.write('(removed = true, done = () => {}) =>');
+          writer.block(() => {
+            for (const stmt of inner_function_statements) {
+              writer.write(stmt.getFullText().trim());
+              writer.newLine();
+            }
+          });
+          writer.write(');');
+          statementsToAppend.push(writer.toString());
+          break;
+        }
+        default: {
+          throw new Error(`Unexpected handler found: ${handler}`);
+        }
+      }
+    }
+  }
+
+  targetAst.body.addStatements([
+    ...extractedLogic.body.map(n => n.getFullText().trim()),
+    ...statementsToAppend.map(n => typeof n === 'string' ? n : n.getFullText().trim())
+  ]);
 }
 
 /**

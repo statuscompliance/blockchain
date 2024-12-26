@@ -6,7 +6,7 @@ import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync } 
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
 import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
-import { convertRequiresToImports, removeREDStatements, renameNode, transformLogic } from '../ast/utils/transforms.ts';
+import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, renameNode, transformLogic } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
 
@@ -156,9 +156,8 @@ for (const file of packages) {
         convertRequiresToImports(sourceAst, targetAst);
         removeREDStatements(contents);
 
-        const innerLogic = extractLogic(contents);
-
-        targetAst.body.addStatements(innerLogic.map(n => n.getFullText().trim()));
+        const extractedLogic = extractLogic(contents);
+        addNodeLogicToChaincode(targetAst, extractedLogic);
         transformLogic(targetAst.body.getBodyOrThrow());
         writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, `${node}.ts`));
       } catch (error) {
