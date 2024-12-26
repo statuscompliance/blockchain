@@ -112,7 +112,7 @@ for (const file of packages) {
       readFileSync(join(process.cwd(), _TMP_packagePath, 'package.json'), 'utf8')
     );
     const packageName = packageJson.name ?? file.replace('.tgz', '');
-    const outputPath = join(baseOutputPath, packageName);
+    const outputPath = join(baseOutputPath, packageName).replace('@', '');
     const nodeDefinitions = packageJson['node-red']?.nodes;
 
     logger.info(`Converting nodes from package ${packageName}...`);
@@ -171,7 +171,7 @@ for (const file of packages) {
      * output artifacts (generated chaincode and the installable nodes package
      * for Node-RED).
      */
-    const chaincodeOutputPath = join(outputPath, 'chaincode').replace('@', '');
+    const chaincodeOutputPath = join(outputPath, 'chaincode');
 
     mkdirSync(chaincodeOutputPath, { recursive: true });
     renameSync(_TMP_chaincodeOutputPath, chaincodeOutputPath);
