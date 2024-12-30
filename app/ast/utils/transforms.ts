@@ -181,10 +181,20 @@ function findReferences(source: Node, target: Node): Node[] {
         return false;
       }
 
-      const referenceSymbol = node.getSymbol();
+      /**
+       * There are some cases where the getSymbol method throws an error
+       * due to (what I believe) is a bug in TypeScript.
+       * TODO: This is a workaround to avoid the error for now, but investigate
+       * further and report upstream in case it's needed.
+       */
+      try {
+        const referenceSymbol = node.getSymbol();
 
-      return referenceSymbol && (referenceSymbol === symbol
-        || referenceSymbol.getAliasedSymbol() === symbol);
+        return referenceSymbol && (referenceSymbol === symbol
+          || referenceSymbol.getAliasedSymbol() === symbol);
+      } catch {
+        return false;
+      }
     });
 
   return source
