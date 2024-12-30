@@ -161,7 +161,7 @@ for (const file of packages) {
         transformLogic(targetAst.body.getBodyOrThrow());
         writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, `${node}.ts`));
       } catch (error) {
-        logger.error(`Converting node ${node}:`, error);
+        logger.error(`Converting node ${node}`, error, (error as Error).stack);
         process.exit(1);
       }
     }
@@ -180,7 +180,7 @@ for (const file of packages) {
     writeFileSync(join(_TMP_packagePath, 'package.json'), JSON.stringify(packageJson, undefined, 2));
     spawnSync('npm', ['pack', '--pack-destination', outputPath, `./${_TMP_packagePath}`], { stdio: 'ignore' });
   } catch (error) {
-    logger.error(`Processing package ${parse(file).name}:`, error);
+    logger.error(`Processing package ${parse(file).name}:`, error, (error as Error).stack);
     process.exit(1);
   } finally {
     /**
