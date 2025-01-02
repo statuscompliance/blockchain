@@ -1,5 +1,7 @@
 # Custom entries
 *blockchain-conversion*
+docker-image.tar
+docker-build/.build
 
 ###################################
 # START OF GITIGNORE TEMPLATE
