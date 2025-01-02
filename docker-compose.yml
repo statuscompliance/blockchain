@@ -5,7 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      privileged: true
     privileged: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+# Needed if not using DIND
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity

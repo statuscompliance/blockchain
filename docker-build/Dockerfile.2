@@ -1,0 +1,6 @@
+# Customize the image
+ARG IMAGE_TAG
+FROM ${IMAGE_TAG}
+
+
+RUN chmod +x /postunpack.sh && /postunpack.sh ${HYPERLEDGER_VERSION} ${HYPERLEDGER_CA_VERSION} && rm -f /postunpack.sh
