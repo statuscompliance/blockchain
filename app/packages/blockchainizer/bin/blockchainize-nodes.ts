@@ -1,7 +1,7 @@
 #!/usr/bin/env -S NODE_NO_WARNINGS=1 node --experimental-strip-types
 import { spawnSync } from 'node:child_process';
 import { join, parse } from 'node:path';
-import { logger } from '../util/logger.ts';
+import { logger } from '@statuscompliance/blockchain-shared/logger';
 import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync } from 'node:fs';
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';

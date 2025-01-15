@@ -2,7 +2,7 @@ FROM node:lts-slim AS build
 
 WORKDIR /tmp/build
 COPY .build/ .
-RUN npm ci --no-audit --omit=dev
+RUN npm ci --no-audit --omit=dev -w @statuscompliance/blockchain-middleware
 
 FROM docker:27-dind
 

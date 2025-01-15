@@ -4,7 +4,7 @@ import unicorn from 'eslint-plugin-unicorn';
 import stylistic from '@stylistic/eslint-plugin';
 import tseslint from 'typescript-eslint';
 
-export default [
+export const getBaseConfig = (base_directory = import.meta.dirname) => ([
   js.configs.recommended,
   unicorn.configs['flat/recommended'],
   stylistic.configs.customize({
@@ -24,9 +24,8 @@ export default [
     languageOptions: {
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-        warnOnUnsupportedTypeScriptVersion: false,
-        extraFileExtensions: ['.vue']
+        tsconfigRootDir: base_directory,
+        warnOnUnsupportedTypeScriptVersion: false
       }
     }
   },
@@ -48,4 +47,4 @@ export default [
       'unicorn/no-await-expression-member': 'off'
     }
   }
-] as Linter.Config[];
+] as Linter.Config[]);

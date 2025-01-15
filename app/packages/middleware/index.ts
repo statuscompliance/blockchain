@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { logger } from './util/logger.ts';
+import { logger } from '@statuscompliance/blockchain-shared/logger';
 
 console.info('Starting status ledger...');
 

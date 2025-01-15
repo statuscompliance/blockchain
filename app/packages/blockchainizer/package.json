@@ -1,0 +1,25 @@
+{
+  "name": "@statuscompliance/blockchainizer",
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "test:ast": "NODE_NO_WARNINGS=1 node --experimental-strip-types ./ast/index.ts",
+    "lint": "eslint . --max-warnings=0 --flag unstable_ts_config",
+    "lint:fix": "eslint . --fix --max-warnings=0 --flag unstable_ts_config",
+    "check:types": "tsc"
+  },
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "tar": "7.4.3",
+    "typescript": "5.7.2"
+  },
+  "bin": {
+    "blockchainize-nodes": "./bin/blockchainize-nodes.ts"
+  },
+  "dependencies": {
+    "@statuscompliance/blockchain-shared": "*",
+    "ts-morph": "24.0.0"
+  }
+}
