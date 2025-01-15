@@ -2,12 +2,5 @@ services:
   ledger:
     restart: always
     container_name: ledger
-    build:
-      context: .
-      dockerfile: Dockerfile
-      privileged: true
+    image: statuscompliance/blockchain
     privileged: true
-# Needed if not using DIND
-#    volumes:
-#      - /var/run/docker.sock:/var/run/docker.sock
-    command: sleep infinity

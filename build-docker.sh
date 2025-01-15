@@ -18,12 +18,13 @@ cleanup() {
   echo "Cleaning up..."
   set +e
   rm -rf docker-build/.build
-  docker rm -f "${CONTAINER_ID}" &> /dev/null
-  docker rmi -f "${TMP_IMAGE_NAME}" &> /dev/null
-  $(docker images -q -f "dangling=true" | xargs -r docker rmi -f) &> /dev/null
-  docker builder prune -af &> /dev/null
-  docker buildx prune -af &> /dev/null
-  docker volume prune -f &> /dev/null
+  docker rm -f "${CONTAINER_ID}" &> /dev/null &
+  docker rmi -f "${TMP_IMAGE_NAME}" &> /dev/null &
+  $(docker images -q -f "dangling=true" | xargs -r docker rmi -f) &> /dev/null &
+  docker builder prune -af &> /dev/null &
+  docker buildx prune -af &> /dev/null &
+  docker volume prune -f &> /dev/null &
+  wait
 }
 
 trap cleanup EXIT
@@ -37,6 +38,8 @@ mkdir -p docker-build/.build
     cp "app/$file" "docker-build/.build/$file"
   fi
 done
+
+rm -rf docker-build/.build/packages/shared/configs docker-build/.build/packages/blockchainizer
 find docker-build/.build \( -name ".gitignore" -o -name "tsconfig.json" -o -name "eslint.config.ts" \) -print0 | xargs -0 rm -rf
 
 docker build \
@@ -45,11 +48,15 @@ docker build \
   -t "${TMP_IMAGE_NAME}" \
   -f ./docker-build/Dockerfile \
   ./docker-build
+
 CONTAINER_ID=$(docker create \
   --privileged \
   "${TMP_IMAGE_NAME}" \
   /postunpack.sh ${HYPERLEDGER_VERSION} ${HYPERLEDGER_CA_VERSION})
 docker start --attach "${CONTAINER_ID}"
-docker stop "${CONTAINER_ID}"
-docker commit -c 'CMD ["npm start"]' "${CONTAINER_ID}" "${TARGET_TAG}"
-docker save "${TARGET_TAG}" > "${TARGET_FILE}"
+
+echo -e "\nBuild finished! Saving the resulting image..."
+docker stop "${CONTAINER_ID}" &> /dev/null
+docker commit -c 'CMD ["/usr/bin/npm", "-w", "@statuscompliance/blockchain-middleware", "start"]' \
+  "${CONTAINER_ID}" "${TARGET_TAG}" &> /dev/null
+docker save "${TARGET_TAG}" > "${TARGET_FILE}" &> /dev/null
