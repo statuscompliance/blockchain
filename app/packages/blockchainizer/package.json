@@ -20,6 +20,6 @@
   },
   "dependencies": {
     "@statuscompliance/blockchain-shared": "*",
-    "ts-morph": "24.0.0"
+    "ts-morph": "25.0.0"
   }
 }
