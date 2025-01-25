@@ -6,8 +6,8 @@
   },
   "scripts": {
     "test:ast": "NODE_NO_WARNINGS=1 node --experimental-strip-types ./ast/index.ts",
-    "lint": "eslint . --max-warnings=0 --flag unstable_ts_config",
-    "lint:fix": "eslint . --fix --max-warnings=0 --flag unstable_ts_config",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
     "check:types": "tsc"
   },
   "license": "AGPL-3.0-only",

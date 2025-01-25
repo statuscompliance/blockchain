@@ -1,6 +1,7 @@
 {
   "extends": "@statuscompliance/blockchain-shared/configs/typescript",
   "include": [
-    "*.ts"
+    "*.ts",
+    "src/**/*.ts"
   ]
 }
