@@ -9,6 +9,7 @@ import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/
 import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, renameNode, transformLogic } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
+import { mkdir } from 'node:fs/promises';
 
 const pathIdentifier = 'blockchain-conversion';
 const suffix = 'blockchainized';
@@ -112,7 +113,7 @@ for (const file of packages) {
       readFileSync(join(process.cwd(), _TMP_packagePath, 'package.json'), 'utf8')
     );
     const packageName = packageJson.name ?? file.replace('.tgz', '');
-    const outputPath = join(baseOutputPath, packageName).replace('@', '');
+    const outputPath = join(baseOutputPath, packageName.replaceAll('@', '').replaceAll('/', '-'));
     const nodeDefinitions = packageJson['node-red']?.nodes;
 
     logger.info(`Converting nodes from package ${packageName}...`);
@@ -121,6 +122,11 @@ for (const file of packages) {
       logger.error('No nodes found in the provided package');
       process.exit(1);
     }
+
+    packageJson.name = `${packageName}_${suffix}`;
+    // The arguments passed to JSON.stringify are for pretty printing
+    const packageJsonContents = JSON.stringify(packageJson, undefined, 2);
+    writeFileSync(join(_TMP_packagePath, 'package.json'), packageJsonContents);
 
     /**
      * Conversion process
@@ -159,7 +165,19 @@ for (const file of packages) {
         const extractedLogic = extractLogic(contents);
         addNodeLogicToChaincode(targetAst, extractedLogic);
         transformLogic(targetAst.body.getBodyOrThrow());
-        writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, `${node}.ts`));
+        writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, node, `${node}.ts`), true);
+
+        // Prepare the output directories' structure to match what Hyperledger expects for the chaincodes
+        await mkdir(join(_TMP_chaincodeOutputPath, node, 'src'), { recursive: true });
+        await mkdir(join(_TMP_chaincodeOutputPath, node, 'dist'), { recursive: true });
+        renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.ts`), join(_TMP_chaincodeOutputPath, node, 'src', `${node}.ts`));
+        renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.js`), join(_TMP_chaincodeOutputPath, node, 'dist', `${node}.js`));
+        writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), packageJsonContents);
+        // Adds the fabric-contract-api dependency to the chaincode's package.json
+        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api'], {
+          stdio: 'ignore',
+          cwd: join(_TMP_chaincodeOutputPath, node)
+        });
       } catch (error) {
         logger.error(`Converting node ${node}`, error, (error as Error).stack);
         process.exit(1);
@@ -175,9 +193,6 @@ for (const file of packages) {
 
     mkdirSync(chaincodeOutputPath, { recursive: true });
     renameSync(_TMP_chaincodeOutputPath, chaincodeOutputPath);
-    packageJson.name = `${packageName}_${suffix}`;
-    // The arguments passed to JSON.stringify are for pretty printing
-    writeFileSync(join(_TMP_packagePath, 'package.json'), JSON.stringify(packageJson, undefined, 2));
     spawnSync('npm', ['pack', '--pack-destination', outputPath, `./${_TMP_packagePath}`], { stdio: 'ignore' });
   } catch (error) {
     logger.error(`Processing package ${parse(file).name}:`, error, (error as Error).stack);
