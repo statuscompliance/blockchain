@@ -4,3 +4,6 @@ services:
     container_name: ledger
     image: statuscompliance/blockchain
     privileged: true
+    network_mode: host
+    volumes:
+      - ./app/packages/blockchainizer/blockchain-conversion:/chaincodes
