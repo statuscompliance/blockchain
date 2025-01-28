@@ -63,7 +63,10 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
   );
 
   source.addImportDeclaration({
-    namedImports: ['Contract'],
+    namedImports: ['Contract', {
+      name: 'Context',
+      isTypeOnly: true
+    }],
     moduleSpecifier: 'fabric-contract-api'
   });
 
@@ -136,14 +139,38 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     name: 'setArgsAndRun',
     scope: Scope.Public,
     initializer: (writer) => {
-      writer.write('(msg, config) =>');
+      writer.write('async (ctx: Context, msg, config) =>');
       writer.block(() => {
-        writer.write('this._msg = msg;');
-        writer.write('this._config = config;');
+        writer.write('this._msg = JSON.parse(msg);');
+        writer.write('this._config = JSON.parse(config);');
         writer.newLine();
         writer.write('this._run();');
+        writer.newLine();
+        writer.write(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(this._result)));`);
       });
     }
+  });
+
+  classNode.addMethod({
+    name: 'getResult',
+    isAsync: true,
+    parameters: [
+      {
+        name: 'ctx',
+        type: 'Context'
+      }
+    ],
+    statements: (writer) => {
+    //
+      writer.write(`const resultAsBytes = await ctx.stub.getState('result');`);
+      writer.write(`if (!resultAsBytes || resultAsBytes.length === 0)`);
+      writer.newLine();
+      writer.block(() => {
+        writer.write(`throw new Error('Result does not exist');`);
+      });
+      writer.write(`return JSON.parse(resultAsBytes.toString());`);
+    }
+
   });
 
   formatAST(source);
