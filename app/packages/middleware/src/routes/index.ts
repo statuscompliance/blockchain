@@ -1,10 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { deployChaincode, listChaincodes, startChannel } from '../hyperledger.ts';
+import { deployChaincode, listChaincodes } from '../hyperledger.ts';
 import { join } from 'node:path';
 import { glob } from 'node:fs/promises';
 import { chaincodePath } from '../constants.ts';
 
-let joinedChannel = false;
 const runningChaincodes = new Map<string, Set<string>>();
 
 export function routes(fastify: FastifyInstance) {
@@ -13,36 +12,6 @@ export function routes(fastify: FastifyInstance) {
     reply: FastifyReply
   ) => {
     reply.code(200).send();
-  });
-
-  fastify.post('/up/channel', {
-    schema: {
-      response: {
-        226: {
-          type: 'null',
-          description: 'The channel is already running'
-        },
-        200: {
-          type: 'null',
-          description: 'Channel started successfully'
-        }
-      }
-    }
-  },
-  async (
-    _: FastifyRequest,
-    reply: FastifyReply
-  ) => {
-    if (joinedChannel) {
-      reply.code(226).send();
-      return;
-    }
-
-    try {
-      await startChannel();
-      joinedChannel = true;
-      reply.code(200).send();
-    } catch {}
   });
 
   fastify.post('/up/chaincode/:pkg/:node', {

@@ -1,6 +1,7 @@
 import { logger } from '@statuscompliance/blockchain-shared/logger';
 import Fastify from 'fastify';
 import { routes } from './src/routes/index.ts';
+import { startChannel } from './src/hyperledger.ts';
 
 console.info('Starting status ledger...');
 
@@ -18,6 +19,9 @@ await app.register(import('@fastify/swagger-ui'), {
 app.register(routes);
 await app.ready();
 app.swagger();
+
+// Starts blockchain operations before listening to requests
+await startChannel();
 
 try {
   await app.listen({
