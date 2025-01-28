@@ -18,13 +18,13 @@ cleanup() {
   echo "Cleaning up..."
   set +e
   rm -rf docker-build/.build
-  docker rm -f "${CONTAINER_ID}" &> /dev/null &
-  docker rmi -f "${TMP_IMAGE_NAME}" &> /dev/null &
+  docker rm -f "${CONTAINER_ID}" &> /dev/null
+  docker rmi -f "${TMP_IMAGE_NAME}" &> /dev/null
   $(docker images -q -f "dangling=true" | xargs -r docker rmi -f) &> /dev/null &
   docker builder prune -af &> /dev/null &
   docker buildx prune -af &> /dev/null &
-  docker volume prune -f &> /dev/null &
   wait
+  docker volume prune -f &> /dev/null
 }
 
 trap cleanup EXIT
