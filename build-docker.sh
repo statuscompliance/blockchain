@@ -55,8 +55,9 @@ CONTAINER_ID=$(docker create \
   /postunpack.sh ${HYPERLEDGER_VERSION} ${HYPERLEDGER_CA_VERSION})
 docker start --attach "${CONTAINER_ID}"
 
-echo -e "\nBuild finished! Saving the resulting image..."
+echo -e "\nBuild finished! Committing..."
 docker stop "${CONTAINER_ID}" &> /dev/null
 docker commit -c 'CMD ["/usr/bin/npm", "-w", "@statuscompliance/blockchain-middleware", "start"]' \
   "${CONTAINER_ID}" "${TARGET_TAG}" &> /dev/null
-docker save "${TARGET_TAG}" > "${TARGET_FILE}" &> /dev/null
+echo "Image committed! Saving to ${TARGET_FILE}"
+docker save "${TARGET_TAG}" > "${TARGET_FILE}"
