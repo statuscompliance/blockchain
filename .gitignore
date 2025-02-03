@@ -1,6 +1,6 @@
 # Custom entries
 *blockchain-conversion*
-docker-image.tar
+docker_images
 docker-build/.build
 
 ###################################

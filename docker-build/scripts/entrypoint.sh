@@ -8,9 +8,9 @@ echo
 declare -a pids=()
 
 find /run /var/run \( -iname 'docker*.pid' -o -iname 'container*.pid' \) | xargs rm -rf
-/usr/local/bin/dockerd-entrypoint.sh dockerd &> /dev/null &
+/usr/local/bin/dockerd-entrypoint.sh dockerd --validate &> /dev/null || true
+dockerd --iptables=false --ip6tables=false &> /dev/null & 
 
-sleep 1
 until docker info &> /dev/null; do
   sleep 1
 done

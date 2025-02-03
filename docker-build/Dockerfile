@@ -8,16 +8,20 @@ FROM docker:27-dind
 
 ARG NODE_VERSION=22
 ARG NPM_VERSION=10.9.1
-#ENV DIND_DEFAULT_LABEL="dind=status-blockchain"
-ENV TINI_SUBREAPER="true" TINI_KILL_PROCESS_GROUP="true"
+# Populated automatically by Docker buildx
+ARG TARGETARCH
+
+ENV TINI_SUBREAPER=true TINI_KILL_PROCESS_GROUP=true
 ENV DOCKER_IMAGE_PATHS="/docker-images" CHAINCODE_PATH="/chaincodes" FABRIC_TOOLS_PATH="/fabric"
 ENV FABRIC_CFG_PATH="${FABRIC_TOOLS_PATH}/config"
 ENV PATH="${PATH}:${FABRIC_TOOLS_PATH}/bin:${FABRIC_TOOLS_PATH}/config"
+#ENV DIND_DEFAULT_LABEL="dind=status-blockchain"
 
 # Environment preparation, Node setup
 #COPY scripts/docker-wrapper.sh /usr/local/sbin/docker
-COPY scripts/postunpack.sh /postunpack.sh
-COPY scripts/entrypoint.sh /entrypoint.sh
+#COPY scripts/postunpack.sh /postunpack.sh
+#COPY scripts/entrypoint.sh /entrypoint.sh
+COPY scripts/*.sh /
 RUN chmod +x /*.sh && \
 # chmod 0755 /usr/local/sbin/docker && \
 # apk add --no-cache nodejs~=${NODE_VERSION} npm~=${NPM_VERSION} bash tini curl && \
