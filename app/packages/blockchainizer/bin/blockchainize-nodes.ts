@@ -171,10 +171,18 @@ for (const file of packages) {
         await mkdir(join(_TMP_chaincodeOutputPath, node, 'src'), { recursive: true });
         await mkdir(join(_TMP_chaincodeOutputPath, node, 'dist'), { recursive: true });
         renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.ts`), join(_TMP_chaincodeOutputPath, node, 'src', `${node}.ts`));
-        renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.js`), join(_TMP_chaincodeOutputPath, node, 'dist', `${node}.js`));
+        renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.js`), join(_TMP_chaincodeOutputPath, node, 'dist', 'index.js'));
         writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), packageJsonContents);
         // Adds the fabric-contract-api dependency to the chaincode's package.json
-        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api'], {
+        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api', 'fabric-shim'], {
+          stdio: 'ignore',
+          cwd: join(_TMP_chaincodeOutputPath, node)
+        });
+        spawnSync('npm', ['pkg', 'set', 'scripts.start=set -x && fabric-chaincode-node start'], {
+          stdio: 'ignore',
+          cwd: join(_TMP_chaincodeOutputPath, node)
+        });
+        spawnSync('npm', ['pkg', 'set', 'main=dist/index.js'], {
           stdio: 'ignore',
           cwd: join(_TMP_chaincodeOutputPath, node)
         });

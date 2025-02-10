@@ -5,7 +5,8 @@ import {
   Scope,
   SourceFile,
   ScriptTarget,
-  ModuleKind
+  ModuleKind,
+  VariableDeclarationKind
 } from 'ts-morph';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { _temporary_filename } from './shared.ts';
@@ -135,19 +136,29 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     }
   });
 
-  classNode.addProperty({
+  classNode.addMethod({
     name: 'setArgsAndRun',
     scope: Scope.Public,
-    initializer: (writer) => {
-      writer.write('async (ctx: Context, msg, config) =>');
-      writer.block(() => {
-        writer.write('this._msg = JSON.parse(msg);');
-        writer.write('this._config = JSON.parse(config);');
-        writer.newLine();
-        writer.write('this._run();');
-        writer.newLine();
-        writer.write(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(this._result)));`);
-      });
+    isAsync: true,
+    parameters: [
+      {
+        name: 'ctx',
+        type: 'Context'
+      },
+      {
+        name: 'msg'
+      },
+      {
+        name: 'config'
+      }
+    ],
+    statements: (writer) => {
+      writer.write('this._msg = JSON.parse(msg);');
+      writer.write('this._config = JSON.parse(config);');
+      writer.newLine();
+      writer.write('this._run();');
+      writer.newLine();
+      writer.write(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(this._result)));`);
     }
   });
 
@@ -170,7 +181,15 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
       });
       writer.write(`return JSON.parse(resultAsBytes.toString());`);
     }
+  });
 
+  source.addVariableStatement({
+    declarationKind: VariableDeclarationKind.Const,
+    isExported: true,
+    declarations: [{
+      name: 'contracts',
+      initializer: '[Chaincode]'
+    }]
   });
 
   formatAST(source);
