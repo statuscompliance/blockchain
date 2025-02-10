@@ -20,12 +20,15 @@ app.register(routes);
 await app.ready();
 app.swagger();
 
-// Starts blockchain operations before listening to requests
-await startChannel();
+// Starts blockchain operations before listening to requests, ensuring it's done inside Docker only
+if (process.env.DOCKER_VERSION) {
+  await startChannel();
+}
 
 try {
   await app.listen({
     port: 3000,
+    host: '::',
     listenTextResolver: (address: string) => {
       logger.info(`Server listening at ${address}`);
       return address;
