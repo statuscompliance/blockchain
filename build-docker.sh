@@ -153,7 +153,7 @@ done
 CURRENT_ARCH=$(docker version \
   --format '{{.Server.Arch}}{{if eq .Server.Arch "arm"}}/{{.Server.Variant}}{{end}}'
 )
-docker load -q < "docker_images/${TARGET_FILE}-${CURRENT_ARCH}.tar" &> /dev/null
+docker load -q < "docker_images/${TARGET_FILE}-${CURRENT_ARCH}.tar" &> /dev/null &
 
 CLEAN_LATEST_TAG=false
 TMP_DOCKERFILE=$(cat << EOF
@@ -172,4 +172,5 @@ echo -e "${TMP_DOCKERFILE}" | docker buildx build \
   -f - \
   . &> /dev/null
 
+wait
 echo "Images built!"

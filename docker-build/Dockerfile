@@ -17,14 +17,13 @@ ENV FABRIC_CFG_PATH="${FABRIC_TOOLS_PATH}/config"
 ENV PATH="${PATH}:${FABRIC_TOOLS_PATH}/bin:${FABRIC_TOOLS_PATH}/config"
 #ENV DIND_DEFAULT_LABEL="dind=status-blockchain"
 
-# Environment preparation, Node setup
-#COPY scripts/docker-wrapper.sh /usr/local/sbin/docker
-#COPY scripts/postunpack.sh /postunpack.sh
-#COPY scripts/entrypoint.sh /entrypoint.sh
+# Environment preparation
 COPY scripts/*.sh /
 RUN chmod +x /*.sh && \
+  # Remove set -eu from the Docker entrypoint script
+  sed -i '/set -e\|set -eu/ { N; /set -e\|set -eu/ {d;} }' /usr/local/bin/dockerd-entrypoint.sh && \
 # chmod 0755 /usr/local/sbin/docker && \
-# apk add --no-cache nodejs~=${NODE_VERSION} npm~=${NPM_VERSION} bash tini curl && \
+# apk add --no-cache nodejs~=${NODE_VERSION} npm~=${NPM_VERSION} bash tini curl libc6-compat jq && \
 # We're using the fabric-tools container directly, but libc6-compat si required for running the Fabric binaries outside the inner containers
 # TODO: Workaround because Nodejs LTS in Alpine repositories does not resolve modules properly
   apk add --no-cache nodejs-current npm bash tini curl libc6-compat jq && \
@@ -39,4 +38,4 @@ COPY --from=build /app .
 
 ENTRYPOINT ["/sbin/tini", "-g", "--", "/entrypoint.sh"]
 
-## The CMD is set in the build-docker.sh file that builds this Dockerfile
+## The CMD is set in the build-docker.sh script that builds this Dockerfile

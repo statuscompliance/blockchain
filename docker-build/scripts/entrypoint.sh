@@ -8,8 +8,13 @@ echo
 declare -a pids=()
 
 find /run /var/run \( -iname 'docker*.pid' -o -iname 'container*.pid' \) | xargs rm -rf
-/usr/local/bin/dockerd-entrypoint.sh dockerd --validate &> /dev/null || true
-dockerd --iptables=false --ip6tables=false &> /dev/null & 
+
+if [[ "$1" = "/postunpack.sh" ]]; then
+  echo "Running dockerd without iptables..."
+  /usr/local/bin/dockerd-entrypoint.sh dockerd --iptables=false --ip6tables=false &> /dev/null &
+else
+  /usr/local/bin/dockerd-entrypoint.sh dockerd &> /dev/null &
+fi
 
 until docker info &> /dev/null; do
   sleep 1
