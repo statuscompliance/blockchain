@@ -1,28 +1,25 @@
 import { spawn } from 'node:child_process';
 import { channelName, networkSh } from './constants.ts';
 
-export async function waitProcess(...arguments_: unknown[]): Promise<string> {
+export async function waitProcess(...arguments_: [string, string[]]): Promise<string> {
   return new Promise((resolve, reject) => {
-    // @ts-expect-error - Type this properly later
     const process = spawn(...arguments_, {
       stdio: ['inherit', 'pipe', 'inherit']
     });
 
     let output = '';
-    process.stdout?.on('data', (data) => {
+    process.stdout.on('data', (data: string) => {
       output += data.toString();
     });
 
-    // @ts-expect-error - Type this properly later
     process.on('close', (code) => {
       if (code === 0) {
         resolve(output);
       } else {
-        reject(new Error(`Process exited with code ${code}`));
+        reject(new Error(`Process exited with code ${code ?? -1}`));
       }
     });
 
-    // @ts-expect-error - Type this properly later
     process.on('error', (error) => {
       reject(error);
     });
@@ -30,25 +27,29 @@ export async function waitProcess(...arguments_: unknown[]): Promise<string> {
 }
 
 export async function startChannel() {
-  await waitProcess(networkSh, ['up', 'createChannel', '-c', channelName, '-s', 'couchdb'], { stdio: 'inherit' });
+  await waitProcess(networkSh, ['up', 'createChannel', '-c', channelName, '-s', 'couchdb']);
 }
 
 export async function stopChannel() {
   await waitProcess(networkSh, ['down']);
 }
 
-export async function deployChaincode(name: string, path: string) {
+function getChaincodeName(package_: string, name: string) {
+  return `${package_}-${name}`;
+}
+
+export async function deployChaincode(package_: string, name: string, path: string) {
   await waitProcess(networkSh, [
     'deployCC',
     '-ccn',
-    name,
+    getChaincodeName(package_, name),
     '-ccp',
     path,
     '-ccl',
-    'typescript',
+    'javascript',
     '-c',
     channelName
-  ], { stdio: 'inherit' });
+  ]);
 }
 
 export async function listChaincodes() {
@@ -62,4 +63,39 @@ export async function listChaincodes() {
       return match ? match[1] : '';
     })
     .filter(Boolean);
+}
+
+export async function transaction(package_: string, name: string, arguments_: { msg: unknown; config: unknown }) {
+  // ./network.sh cc invoke -c statuscompliance -ccn and -ccic '{"Args":["setArgsAndRun","{\"payload\":{\"result\":true,\"index\":1}}","{}"]}'
+  await waitProcess(networkSh, [
+    'cc',
+    'invoke',
+    '-c',
+    channelName,
+    '-ccn',
+    getChaincodeName(package_, name),
+    '-ccic',
+    JSON.stringify({
+      Args: ['setArgsAndRun',
+        JSON.stringify(arguments_.msg),
+        JSON.stringify(arguments_.config)
+      ]
+    })
+  ]);
+}
+
+export async function query(package_: string, name: string) {
+  // ./network.sh cc query -c statuscompliance -ccn and -ccqc '{"Args":["getResult"]}'
+  await waitProcess(networkSh, [
+    'cc',
+    'query',
+    '-c',
+    channelName,
+    '-ccn',
+    getChaincodeName(package_, name),
+    '-ccqc',
+    JSON.stringify({
+      Args: ['getResult']
+    })
+  ]);
 }
