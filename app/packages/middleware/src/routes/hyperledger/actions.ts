@@ -1,28 +1,18 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { deployChaincode } from '../../hyperledger.ts';
+import { deployChaincode, transaction } from '../../hyperledger.ts';
 import { glob } from 'node:fs/promises';
-import { chaincodePath } from '../../constants.ts';
+import {
+  chaincodePath,
+  commonChaincodeQueryParameters,
+  runningChaincodes,
+  type CommonChaincodeQueryParameters
+} from '../../constants.ts';
 import { join } from 'node:path';
 
-const runningChaincodes = new Map<string, Set<string>>();
-
 export function hyperledgerActions(fastify: FastifyInstance) {
-  fastify.post('/up/chaincode/:pkg/:node', {
+  fastify.post('/chaincode/up/:pkg/:node', {
     schema: {
-      params: {
-        type: 'object',
-        properties: {
-          pkg: {
-            type: 'string',
-            description: 'Pass without @ and replacing / with -'
-          },
-          node: {
-            type: 'string',
-            description: 'Name of the node to initialize transactions'
-          }
-        },
-        required: ['pkg', 'node']
-      },
+      params: commonChaincodeQueryParameters(),
       response: {
         226: {
           type: 'null',
@@ -41,7 +31,7 @@ export function hyperledgerActions(fastify: FastifyInstance) {
   },
   async (
     request: FastifyRequest<{
-      Params: { node: string; pkg: string };
+      Params: CommonChaincodeQueryParameters;
     }>,
     reply: FastifyReply
   ) => {
@@ -66,7 +56,7 @@ export function hyperledgerActions(fastify: FastifyInstance) {
     }
 
     try {
-      await deployChaincode(node, found);
+      await deployChaincode(pkg, node, found);
 
       const runningChaincodeByPackage = runningChaincodes.get(pkg);
       if (runningChaincodeByPackage) {
@@ -74,6 +64,47 @@ export function hyperledgerActions(fastify: FastifyInstance) {
       } else {
         runningChaincodes.set(pkg, new Set([node]));
       }
+    } catch {
+      reply.code(500).send();
+      return;
+    }
+
+    reply.code(200).send();
+  });
+
+  fastify.post('/chaincode/transaction/:pkg/:node', {
+    schema: {
+      params: commonChaincodeQueryParameters(),
+      body: {
+        type: 'object',
+        properties: {
+          msg: {
+            type: 'object'
+          },
+          config: {
+            type: 'object'
+          }
+        },
+        required: ['msg', 'config']
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{
+      Params: CommonChaincodeQueryParameters;
+      Body: { msg: unknown; config: unknown };
+    }>,
+    reply: FastifyReply
+  ) => {
+    const { node, pkg } = request.params;
+
+    if (!runningChaincodes.get(pkg)?.has(node)) {
+      reply.code(404).send();
+      return;
+    }
+
+    try {
+      await transaction(pkg, node, request.body);
     } catch {
       reply.code(500).send();
       return;
