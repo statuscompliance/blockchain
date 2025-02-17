@@ -11,8 +11,7 @@ await app.register(import('@fastify/swagger'));
 await app.register(import('@fastify/swagger-ui'), {
   routePrefix: '/documentation',
   uiConfig: {
-    docExpansion: 'full',
-    deepLinking: false
+    docExpansion: 'full'
   }
 });
 
@@ -35,5 +34,5 @@ try {
     }
   });
 } catch (error) {
-  app.log.error(error);
+  logger.error(error);
 }

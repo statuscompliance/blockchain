@@ -15,6 +15,8 @@
     "@fastify/autoload": "6.0.3",
     "@fastify/swagger": "9.4.1",
     "@fastify/swagger-ui": "5.2.1",
+    "@grpc/grpc-js": "1.12.6",
+    "@hyperledger/fabric-gateway": "1.7.1",
     "@statuscompliance/blockchain-shared": "*",
     "fastify": "5.2.1"
   }

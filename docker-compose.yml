@@ -1,6 +1,6 @@
 services:
   ledger:
-    restart: always
+    restart: no
     container_name: ledger
     image: statuscompliance/blockchain
     privileged: true

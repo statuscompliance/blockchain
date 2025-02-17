@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { channelName, networkSh } from './constants.ts';
+import { channelName, getLedgerGateway, networkSh } from './constants.ts';
 
 export async function waitProcess(...arguments_: [string, string[]]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -66,22 +66,18 @@ export async function listChaincodes() {
 }
 
 export async function transaction(package_: string, name: string, arguments_: { msg: unknown; config: unknown }) {
-  // ./network.sh cc invoke -c statuscompliance -ccn and -ccic '{"Args":["setArgsAndRun","{\"payload\":{\"result\":true,\"index\":1}}","{}"]}'
-  await waitProcess(networkSh, [
-    'cc',
-    'invoke',
-    '-c',
-    channelName,
-    '-ccn',
-    getChaincodeName(package_, name),
-    '-ccic',
-    JSON.stringify({
-      Args: ['setArgsAndRun',
-        JSON.stringify(arguments_.msg),
-        JSON.stringify(arguments_.config)
-      ]
-    })
-  ]);
+  try {
+    const { network } = getLedgerGateway();
+    const contract = network.getContract(getChaincodeName(package_, name));
+    const transactionResult = await contract.submitTransaction(
+      'setArgsAndRun',
+      JSON.stringify(arguments_.msg),
+      JSON.stringify(arguments_.config)
+    );
+    console.log(JSON.stringify(transactionResult));
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 export async function query(package_: string, name: string) {
