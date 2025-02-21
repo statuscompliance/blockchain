@@ -16,7 +16,7 @@ const testNetworkPath = join(fabricPath, 'test-network');
 export const networkSh = join(testNetworkPath, 'network.sh');
 export const channelName = 'statuscompliance';
 export const runningChaincodes = new Map<string, Set<string>>();
-export const commonChaincodeQueryParameters = () => ({
+export const commonChaincodeQueryParameters = (additional: Record<string, unknown> = {}) => ({
   type: 'object',
   properties: {
     pkg: {
@@ -26,9 +26,10 @@ export const commonChaincodeQueryParameters = () => ({
     node: {
       type: 'string',
       description: 'Name of the node to initialize transactions'
-    }
+    },
+    ...additional
   },
-  required: ['pkg', 'node']
+  required: ['pkg', 'node', ...Object.keys(additional)]
 });
 
 let gateway: Gateway | undefined;

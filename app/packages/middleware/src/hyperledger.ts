@@ -66,20 +66,19 @@ export async function listChaincodes() {
 }
 
 export async function transaction(package_: string, name: string, arguments_: { msg: unknown; config: unknown }) {
-  try {
-    const { network } = getLedgerGateway();
-    const contract = network.getContract(getChaincodeName(package_, name));
-    const transactionResult = await contract.submitTransaction(
-      'setArgsAndRun',
-      JSON.stringify(arguments_.msg),
-      JSON.stringify(arguments_.config)
-    );
-    console.log(JSON.stringify(transactionResult));
-  } catch (error) {
-    console.error(error);
-  }
+  const { network } = getLedgerGateway();
+  const contract = network.getContract(getChaincodeName(package_, name));
+  const result = await contract.submitTransaction(
+    'setArgsAndRun',
+    JSON.stringify(arguments_.msg),
+    JSON.stringify(arguments_.config)
+  );
+  return JSON.parse(Buffer.from(result).toString('utf8'));
 }
 
+/**
+ * TODO: Finish the querying until all the requirements are properly determined
+ */
 export async function query(package_: string, name: string) {
   // ./network.sh cc query -c statuscompliance -ccn and -ccqc '{"Args":["getResult"]}'
   await waitProcess(networkSh, [

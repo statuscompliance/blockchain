@@ -72,9 +72,14 @@ export function hyperledgerActions(fastify: FastifyInstance) {
     reply.code(200).send();
   });
 
-  fastify.post('/chaincode/transaction/:pkg/:node', {
+  fastify.post('/chaincode/transaction/:pkg/:node/:id', {
     schema: {
-      params: commonChaincodeQueryParameters(),
+      params: commonChaincodeQueryParameters({
+        id: {
+          type: 'string',
+          description: 'Instance ID of the node'
+        }
+      }),
       body: {
         type: 'object',
         properties: {
@@ -104,12 +109,10 @@ export function hyperledgerActions(fastify: FastifyInstance) {
     }
 
     try {
-      await transaction(pkg, node, request.body);
+      return await transaction(pkg, node, request.body);
     } catch {
       reply.code(500).send();
       return;
     }
-
-    reply.code(200).send();
   });
 }
