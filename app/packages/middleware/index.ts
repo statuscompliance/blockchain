@@ -26,7 +26,7 @@ if (process.env.DOCKER_VERSION) {
 
 try {
   await app.listen({
-    port: 3000,
+    port: 80,
     host: '::',
     listenTextResolver: (address: string) => {
       logger.info(`Server listening at ${address}`);

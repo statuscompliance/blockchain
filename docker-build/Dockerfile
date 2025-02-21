@@ -36,6 +36,8 @@ WORKDIR /app
 
 COPY --from=build /app .
 
+EXPOSE 80
+
 ENTRYPOINT ["/sbin/tini", "-g", "--", "/entrypoint.sh"]
 
 ## The CMD is set in the build-docker.sh script that builds this Dockerfile
