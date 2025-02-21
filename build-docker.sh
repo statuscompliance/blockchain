@@ -41,7 +41,7 @@ cleanup() {
   docker buildx prune -af &> /dev/null
   docker buildx rm statuscompliance-builder &> /dev/null
   docker rmi -f registry:2 &> /dev/null
-  docker images --filter=reference='tonistiigi/binfmt*' -q | xargs -r docker rmi -f &> /dev/null
+  docker images --filter=reference='tonistiigi/binfmt' -q | xargs -r docker rmi -f &> /dev/null
   docker images --filter=reference='moby/buildkit*' -q | xargs -r docker rmi -f &> /dev/null
   $(docker images -q -f "dangling=true" | xargs -r docker rmi -f) &> /dev/null
   docker volume prune -f &> /dev/null
@@ -65,13 +65,13 @@ rm -rf docker-build/.build/packages/shared/configs docker-build/.build/packages/
 find docker-build/.build \( -name ".gitignore" -o -name "tsconfig.json" -o -name "eslint.config.ts" \) -print0 | xargs -0 rm -rf
 
 echo "Preparing for multi-platform building..."
-# This specific QEMU version is needed so tini work inside the container in arm64.
-# First, we uninstall older versions of QEMU so we stricly use v9.2.0 (the install all command doesn't do this
+# At least QEMU 9.2.0 version is needed so tini work inside the container in arm64.
+# First, we uninstall older versions of QEMU so we stricly use latest (the install all command doesn't do this
 # if older versions are found).
-emulators=$(docker run --privileged -q --rm tonistiigi/binfmt:qemu-v9.2.0)
+emulators=$(docker run --privileged -q --rm tonistiigi/binfmt)
 emulators=$(echo "$emulators" | jq -r '.emulators | join(",")')
-docker run --privileged --rm tonistiigi/binfmt:qemu-v9.2.0 --uninstall "${emulators}" &> /dev/null
-docker run --privileged --rm tonistiigi/binfmt:qemu-v9.2.0 --install all &> /dev/null
+docker run --privileged --rm tonistiigi/binfmt --uninstall "${emulators}" &> /dev/null
+docker run --privileged --rm tonistiigi/binfmt --install all &> /dev/null
 docker buildx create --name statuscompliance-builder \
   --driver docker-container \
   --driver-opt=network=host \
