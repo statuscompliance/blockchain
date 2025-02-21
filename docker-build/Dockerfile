@@ -4,7 +4,7 @@ WORKDIR /app
 COPY .build/ .
 RUN npm ci --no-audit --omit=dev -w @statuscompliance/blockchain-middleware
 
-FROM docker:27-dind
+FROM docker:28-dind
 
 ARG NODE_VERSION=22
 ARG NPM_VERSION=10.9.1
