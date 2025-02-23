@@ -1,5 +1,5 @@
 import { basename, dirname, extname, join } from 'node:path';
-import { CodeBlockWriter, ModuleKind, Node, SourceFile, SyntaxKind } from 'ts-morph';
+import { CodeBlockWriter, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclarationKind } from 'ts-morph';
 import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
 import { extractDefinitionFromHTML, extractLogic } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
@@ -106,12 +106,11 @@ export function addNodeLogicToChaincode(
         case 'close': {
           const writer = new CodeBlockWriter();
 
-          writer.write('this._cleanups.add(');
+          writer.writeLine('this._cleanups.add(');
           writer.write('(removed = true, done = () => {}) =>');
           writer.block(() => {
             for (const stmt of inner_function_statements) {
-              writer.write(stmt.getFullText().trim());
-              writer.newLine();
+              writer.writeLine(stmt.getFullText().trim());
             }
           });
           writer.write(');');
@@ -307,7 +306,7 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
   const registerCall = updateNodeNameInRegistration(source, identifier);
 
   /**
-   * Modifies the category of the node to be the value of categoryToAssign
+   * Modifies the category of the node to be the value of identifier
    */
   const secondArgument = registerCall.getArguments()[1].asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
   const categoryProperty = secondArgument.getProperty('category')
@@ -336,7 +335,7 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
  * // returns "/path/to/file-suffix.ts"
  * addSuffixToFileName("/path/to/file.ts", "-suffix")
  */
-function addSuffixToFileName(filePath: string, suffix: string) {
+export function addSuffixToFileName(filePath: string, suffix: string) {
   const directory = dirname(filePath);
   const extension = extname(filePath);
   const baseName = basename(filePath, extension);
@@ -346,7 +345,8 @@ function addSuffixToFileName(filePath: string, suffix: string) {
 }
 
 /**
- * Updates the name of the node:
+ * Updates the name of the node, adds initialization logic and editing options.
+ * The name is updated:
  * - In the node itself
  * - In the HTML definition of the node.
  * - In the package.json object
@@ -354,7 +354,7 @@ function addSuffixToFileName(filePath: string, suffix: string) {
  * @param cjs_exports - The AST of the module.exports from the node (obtained from
  * extractors/extractModuleExports)
  */
-export function renameNode(
+export function transformNodeDefinition(
   sourcePath: string,
   sourceAst: SourceFile,
   cjs_exports: Node,
@@ -393,4 +393,83 @@ export function renameNode(
    */
   node_defs[`${node}-${identifier}`] = addSuffixToFileName(node_defs[node], identifier);
   delete node_defs[node];
+}
+
+function writeFetchCatchBlock(writer: CodeBlockWriter) {
+  writer.write('catch (e)');
+  writer.block(() => {
+    writer.writeLine('this.error(e);');
+    writer.writeLine('throw e;');
+  });
+};
+
+export function connectNodeWithBlockchain(
+  source: Node,
+  packageName: string,
+  node: string
+) {
+  const inners = source.asKindOrThrow(SyntaxKind.Block);
+  for (const stmt of inners.getStatementsWithComments()) {
+    stmt.remove();
+  }
+
+  inners.addVariableStatement({
+    declarationKind: VariableDeclarationKind.Let,
+    declarations: [{
+      name: 'blockchain_started',
+      initializer: 'false'
+    }]
+  });
+  inners.addVariableStatement({
+    declarationKind: VariableDeclarationKind.Const,
+    declarations: [{
+      name: 'PACKAGE_NAME',
+      initializer: `'${packageName.replaceAll('@', '').replaceAll(' / ', ' - ')}'`
+    },
+    {
+      name: 'NODE_NAME',
+      initializer: `'${node}'`
+    },
+    {
+      name: 'LEDGER_URL',
+      initializer: '`http://${process.env.STATUS_LEDGER_ENDPOINT}`'
+    },
+    {
+      name: 'INSTANCE_ID',
+      initializer: 'config.id'
+    },
+    {
+      name: 'START_BLOCKCHAIN',
+      initializer: (writer) => {
+        writer.write('async () =>');
+        writer.block(() => {
+          writer.write('try');
+          writer.block(() => {
+            writer.writeLine('await fetch(`${LEDGER_URL}/chaincode/up/${PACKAGE_NAME}/${NODE_NAME}`, { method: "POST" })');
+            writer.writeLine('blockchain_started = true;');
+          });
+          writeFetchCatchBlock(writer);
+        });
+      }
+    }
+    ]
+  });
+  inners.appendWhitespace('\n');
+  inners.addStatements((writer) => {
+    writer.write('this.on("input", async (msg) =>');
+    writer.block(() => {
+      writer.write('if (!blockchain_started)');
+      writer.block(() => {
+        writer.writeLine('await START_BLOCKCHAIN();');
+      });
+      writer.writeLine('const ops = { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ msg, config }) };');
+      writer.write('try');
+      writer.block(() => {
+        writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/transaction/${PACKAGE_NAME}/${NODE_NAME}/${INSTANCE_ID}`, ops);');
+        writer.writeLine('this.send(await response.json());');
+      });
+      writeFetchCatchBlock(writer);
+    });
+    writer.write(');');
+  });
 }

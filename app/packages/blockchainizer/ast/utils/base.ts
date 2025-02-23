@@ -43,9 +43,13 @@ export function getProject({ useMemory = true, module = ModuleKind.Preserve } = 
 /**
  * Writes the resulting AST to a file
  */
-export function writeASTToFile(ast: SourceFile, path: string, emit = false) {
+export function writeASTToFile(ast: SourceFile, path?: string, emit = false) {
   formatAST(ast);
-  ast.move(path, { overwrite: true });
+
+  if (path) {
+    ast.move(path, { overwrite: true });
+  }
+  
   ast.saveSync();
 
   if (emit) {

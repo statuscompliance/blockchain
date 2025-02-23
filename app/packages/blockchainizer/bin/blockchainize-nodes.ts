@@ -1,15 +1,16 @@
 #!/usr/bin/env -S NODE_NO_WARNINGS=1 node --experimental-strip-types
 import { spawnSync } from 'node:child_process';
-import { join, parse } from 'node:path';
+import { basename, join, parse } from 'node:path';
 import { logger } from '@statuscompliance/blockchain-shared/logger';
 import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync } from 'node:fs';
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
 import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
-import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, renameNode, transformLogic } from '../ast/utils/transforms.ts';
+import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, transformNodeDefinition, transformLogic, addSuffixToFileName, connectNodeWithBlockchain } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
 import { mkdir } from 'node:fs/promises';
+import { stringify } from '../ast/utils/shared.ts';
 
 const pathIdentifier = 'blockchain-conversion';
 const suffix = 'blockchainized';
@@ -124,9 +125,6 @@ for (const file of packages) {
     }
 
     packageJson.name = `${packageName}_${suffix}`;
-    // The arguments passed to JSON.stringify are for pretty printing
-    const packageJsonContents = JSON.stringify(packageJson, undefined, 2);
-    writeFileSync(join(_TMP_packagePath, 'package.json'), packageJsonContents);
 
     /**
      * Conversion process
@@ -135,6 +133,14 @@ for (const file of packages) {
 
     for (const node in nodeDefinitions) {
       logger.info(`|- [${packageName}] Converting node '${node}'...`);
+
+      /**
+       * Renames the node file with the appropiate suffix
+       */
+      const newNodePath = addSuffixToFileName(nodeDefinitions[node], suffix);
+      const newNodeNameWithoutExtension = basename(newNodePath).split('.')[0];
+
+      nodeDefinitions[newNodeNameWithoutExtension] = newNodePath;
 
       try {
         const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]);
@@ -149,7 +155,7 @@ for (const file of packages) {
           throw new Error('No module.exports found');
         }
 
-        renameNode(
+        transformNodeDefinition(
           sourcePath,
           sourceAst,
           innerExportsAst,
@@ -157,6 +163,10 @@ for (const file of packages) {
           nodeDefinitions,
           suffix
         );
+
+        /**
+         * Chaincode's logic
+         */
 
         const contents = extractNodeContents(innerExportsAst);
         convertRequiresToImports(sourceAst, targetAst);
@@ -172,7 +182,9 @@ for (const file of packages) {
         await mkdir(join(_TMP_chaincodeOutputPath, node, 'dist'), { recursive: true });
         renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.ts`), join(_TMP_chaincodeOutputPath, node, 'src', `${node}.ts`));
         renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.js`), join(_TMP_chaincodeOutputPath, node, 'dist', 'index.js'));
-        writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), packageJsonContents);
+        const packageJsonCopy = structuredClone(packageJson);
+        delete packageJsonCopy['node-red'];
+        writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), stringify(packageJsonCopy));
         // Adds the fabric-contract-api dependency to the chaincode's package.json
         spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api'], {
           stdio: 'ignore',
@@ -186,11 +198,23 @@ for (const file of packages) {
           stdio: 'ignore',
           cwd: join(_TMP_chaincodeOutputPath, node)
         });
+
+        /**
+         * Node logic
+         */
+        connectNodeWithBlockchain(contents, packageName, node);
+        writeASTToFile(sourceAst);
+        delete nodeDefinitions[node];
       } catch (error) {
         logger.error(`Converting node ${node}`, error, (error as Error).stack);
         process.exit(1);
       }
     }
+
+    /**
+     * Write the nodered nodes' package.json file
+     */
+    writeFileSync(join(_TMP_packagePath, 'package.json'), stringify(packageJson));
 
     /**
      * After all the transformations are done, we pack and prepare the
