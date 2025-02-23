@@ -174,7 +174,7 @@ for (const file of packages) {
         renameSync(join(_TMP_chaincodeOutputPath, node, `${node}.js`), join(_TMP_chaincodeOutputPath, node, 'dist', 'index.js'));
         writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), packageJsonContents);
         // Adds the fabric-contract-api dependency to the chaincode's package.json
-        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api', 'fabric-shim'], {
+        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api'], {
           stdio: 'ignore',
           cwd: join(_TMP_chaincodeOutputPath, node)
         });
