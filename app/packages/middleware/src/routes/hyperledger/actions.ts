@@ -16,7 +16,7 @@ export function hyperledgerActions(fastify: FastifyInstance) {
       response: {
         226: {
           type: 'null',
-          description: 'The chaincode is already installed and ruinning'
+          description: 'The chaincode is already installed and running'
         },
         200: {
           type: 'null',
