@@ -39,7 +39,7 @@ export function extractNodeContents(cjs_exports: BinaryExpression) {
     reject();
   }
 
-  return nodeBody;
+  return { contents: nodeBody, nodeDefinition };
 }
 
 /**

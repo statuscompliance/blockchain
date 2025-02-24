@@ -49,7 +49,7 @@ export function writeASTToFile(ast: SourceFile, path?: string, emit = false) {
   if (path) {
     ast.move(path, { overwrite: true });
   }
-  
+
   ast.saveSync();
 
   if (emit) {

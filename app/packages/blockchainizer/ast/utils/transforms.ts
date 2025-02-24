@@ -1,5 +1,5 @@
 import { basename, dirname, extname, join } from 'node:path';
-import { CodeBlockWriter, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclaration, VariableDeclarationKind } from 'ts-morph';
+import { CodeBlockWriter, FunctionDeclaration, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclarationKind } from 'ts-morph';
 import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
 import { extractDefinitionFromHTML, extractLogic } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
@@ -162,6 +162,19 @@ export function convertRequiresToImports(cjsAST: SourceFile, chaincode: IBaseCha
 }
 
 /**
+ * There are some cases where the getSymbol method throws an error
+ * due to (what I believe) is a bug in TypeScript.
+ *
+ * TODO: This is a workaround to avoid the error for now, but investigate
+ * further and report upstream in case it's needed.
+ */
+function safeGetSymbol(node: Node) {
+  try {
+    return node.getSymbol();
+  } catch {}
+}
+
+/**
  * Finds all references to the given node in the source file
  * This covers cases like:
  * ```
@@ -172,7 +185,7 @@ export function convertRequiresToImports(cjsAST: SourceFile, chaincode: IBaseCha
  * second parameter that you pass to this function.
  */
 function findReferences(source: Node, target: Node): Node[] {
-  const symbol = target.getSymbol();
+  const symbol = safeGetSymbol(target);
 
   const references = source
     .getDescendants()
@@ -181,14 +194,8 @@ function findReferences(source: Node, target: Node): Node[] {
         return false;
       }
 
-      /**
-       * There are some cases where the getSymbol method throws an error
-       * due to (what I believe) is a bug in TypeScript.
-       * TODO: This is a workaround to avoid the error for now, but investigate
-       * further and report upstream in case it's needed.
-       */
       try {
-        const referenceSymbol = node.getSymbol();
+        const referenceSymbol = safeGetSymbol(node);
 
         return referenceSymbol && (referenceSymbol === symbol
           || referenceSymbol.getAliasedSymbol() === symbol);
@@ -212,37 +219,37 @@ function findReferences(source: Node, target: Node): Node[] {
 }
 
 /**
- * Removes the Node-RED specific statements from the source file (declarations like
- * RED.nodes.createNode, RED.nodes.registerType, etc.)
+ * Erases the reassignments of a variable in the source AST. For example, if passed as variable
+ * the symbol of the this keyword, the following:
  *
- * Reassignments to this (like `var node = this`) will be also removed.
+ * ```
+ * const node = this;
+ * const node2 = node;
+ * node2.on('input', () => {});
+ * ```
+ *
+ * Will be replaced with:
+ *
+ * ```
+ * this.on('input', () => {});
+ * ```
  */
-export function removeREDStatements(source: Node): void {
-  for (const node of source
-    .getDescendants()
-    .filter(node =>
-      node.isKind(SyntaxKind.CallExpression)
-      && node.getText().startsWith('RED.nodes.')
-    )) {
-    const statement = node.getFirstAncestorByKind(SyntaxKind.ExpressionStatement);
-    if (statement) {
-      statement.remove();
-    }
-  }
-
-  const nodeThis = source
+export function eraseReassignments(source: Node, variable: Node | string, overrideNewName?: string) {
+  const reassignments = source
     .getDescendants()
     .find(node =>
       (
         node.isKind(SyntaxKind.VariableDeclaration)
         || node.isKind(SyntaxKind.VariableDeclarationList)
-      ) && node.getText().endsWith('this')
+      ) && (typeof variable === 'string'
+        ? node.getText().endsWith(variable)
+        : safeGetSymbol(node) === safeGetSymbol(variable))
     )?.asKindOrThrow(SyntaxKind.VariableDeclarationList);
 
-  if (nodeThis) {
-    for (const declaration of nodeThis.getDeclarations()) {
+  if (reassignments) {
+    for (const declaration of reassignments.getDeclarations()) {
       const variableName = declaration.getName();
-      const otherReferences = findReferences(source, nodeThis);
+      const otherReferences = findReferences(source, reassignments);
       declaration.remove();
 
       const nodeReferences = source
@@ -252,8 +259,10 @@ export function removeREDStatements(source: Node): void {
           && node.getText().startsWith(variableName)
         );
 
-      for (const reference of [...nodeReferences, ...otherReferences]) {
-        reference.replaceWithText('this');
+      for (const reference of nodeReferences) {
+        reference.replaceWithText(
+          overrideNewName ?? (typeof variable === 'string' ? variable : variable.getText())
+        );
       }
 
       for (const node of otherReferences) {
@@ -263,6 +272,48 @@ export function removeREDStatements(source: Node): void {
           statement.remove();
         }
       }
+    }
+  }
+}
+
+/**
+ * - Replaces assignments like `var node = this` with `this` directly.
+ * - The first parameter of the node's function expression will be added if it doesn't exist
+ * (or renamed to config if it's named differently).
+ *
+ * Also ensures the variables are named as expected everywhere (for instance, if `config`
+ * was not being named `config` in any of the child nodes, it will be renamed to `config`).
+ */
+export function ensureEnvironmentConsistency(body: Node, functionExpr: FunctionDeclaration): void {
+  const configParameter = functionExpr.getParameters()[0];
+  const newConfigName = 'config';
+  eraseReassignments(body, 'this');
+
+  if (configParameter) {
+    configParameter.rename(newConfigName);
+    eraseReassignments(body, configParameter.getName(), newConfigName);
+  } else {
+    functionExpr.addParameter({
+      name: newConfigName
+    });
+  }
+}
+
+/**
+ * Removes the Node-RED specific statements from the source file (declarations like
+ * RED.nodes.createNode, RED.nodes.registerType, etc.)
+ */
+export function removeREDStatements(source: Node): void {
+  for (const node of source
+    .getDescendants()
+    .filter(node =>
+      node.isKind(SyntaxKind.CallExpression)
+      && node.getText().startsWith('RED.nodes.')
+    )) {
+    const statement = node.getFirstAncestorByKind(SyntaxKind.ExpressionStatement);
+
+    if (statement) {
+      statement.remove();
     }
   }
 }
