@@ -207,21 +207,21 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
 }
 
 /**
+ * Reads the contents of a text file
+ */
+export function readTextFile(path: string): string {
+  return readFileSync(path, 'utf8');
+}
+
+/**
  * Converts a file into an AST
  */
 export function nodeToAST(path: string, ...project_arguments: Parameters<typeof getProject>): SourceFile {
   const project = getProject(...project_arguments);
-  const source = project.createSourceFile(_temporary_filename, readFileSync(path).toString());
+  const source = project.createSourceFile(_temporary_filename, readTextFile(path).toString());
   formatAST(source);
 
   return source;
-}
-
-/**
- * Reads the contents of an HTML file
- */
-export function readHTMLFile(htmlPath: string): string {
-  return readFileSync(htmlPath, 'utf8');
 }
 
 /**

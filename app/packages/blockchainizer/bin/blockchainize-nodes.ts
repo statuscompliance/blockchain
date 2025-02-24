@@ -2,9 +2,9 @@
 import { spawnSync } from 'node:child_process';
 import { join, parse } from 'node:path';
 import { logger } from '@statuscompliance/blockchain-shared/logger';
-import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { extract } from 'tar';
-import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
+import { nodeToAST, getBaseChaincodeAST, writeASTToFile, readTextFile } from '../ast/utils/base.ts';
 import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
 import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, transformNodeDefinition, transformLogic, connectNodeWithBlockchain, ensureEnvironmentConsistency } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
@@ -111,7 +111,7 @@ for (const file of packages) {
      * Fetches the nodes JavaScript files from the package.json
      */
     const packageJson: PackageJsonWithNodeRedDefinitions = JSON.parse(
-      readFileSync(join(process.cwd(), _TMP_packagePath, 'package.json'), 'utf8')
+      readTextFile(join(process.cwd(), _TMP_packagePath, 'package.json'))
     );
     const packageName = packageJson.name ?? file.replace('.tgz', '');
     const sanitizedPackageName = packageName.replaceAll('@', '').replaceAll('/', '-');
@@ -217,7 +217,7 @@ for (const file of packages) {
     const flowsPath = join(process.cwd(), _TMP_packagePath, 'flows.json');
 
     if (existsSync(flowsPath)) {
-      const flowsJson = JSON.parse(readFileSync(flowsPath, 'utf8'));
+      const flowsJson = JSON.parse(readTextFile(flowsPath));
 
       for (const object of flowsJson) {
         if (nodeNames.has(object.type)) {
