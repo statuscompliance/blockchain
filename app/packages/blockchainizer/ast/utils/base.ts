@@ -8,7 +8,7 @@ import {
   ModuleKind,
   VariableDeclarationKind
 } from 'ts-morph';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { _temporary_filename } from './shared.ts';
 
 export interface IBaseChaincodeAST {
@@ -222,16 +222,4 @@ export function nodeToAST(path: string, ...project_arguments: Parameters<typeof 
   formatAST(source);
 
   return source;
-}
-
-/**
- * Writes the modified script tags into the HTML file
- */
-export function writeModifiedHTML({ originalContents, originalScript, newScript, htmlPath }: {
-  originalContents: string;
-  originalScript: string;
-  newScript: string;
-  htmlPath: string;
-}) {
-  writeFileSync(htmlPath, originalContents.replace(originalScript, newScript));
 }

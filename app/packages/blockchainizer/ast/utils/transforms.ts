@@ -1,9 +1,10 @@
 import { basename, dirname, extname, join } from 'node:path';
 import { CodeBlockWriter, FunctionDeclaration, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclarationKind } from 'ts-morph';
-import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
-import { extractDefinitionFromHTML, extractLogic } from './extractors.ts';
+import { type IBaseChaincodeAST, getProject, writeASTToFile, readTextFile } from './base.ts';
+import { extractLogic } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
+import { parseHTML } from 'linkedom';
 
 /**
  * Replaces a node with a new one, safely checking if the node has a parent
@@ -322,11 +323,9 @@ export function removeREDStatements(source: Node): void {
 
 /**
  * Updates the name of the node in the `RED.nodes.registerType` call.
- * @returns `[registerCall]` - The AST of the `RED.nodes.registerType` call
- * @returns `[newName]`- The new name of the node
- * @returns `[originalName]` - The original name of the node
+ * @returns - The AST of the `RED.nodes.registerType` call
  */
-function updateNodeNameInRegistration(source: Node, identifier: string) {
+function updateNodeNameInRegistration(source: Node, new_node_name: string) {
   const registerCall = source
     .getDescendants()
     .findLast(node =>
@@ -342,19 +341,9 @@ function updateNodeNameInRegistration(source: Node, identifier: string) {
   /**
    * Modifies the argument to append the identifier to the node name
    */
-  const firstArgument = registerCall.getArguments()[0];
-  const originalValue = firstArgument!.getText().replaceAll(/['"]/g, '');
-  const newName = `'${originalValue}-${identifier}'`;
-  firstArgument?.replaceWithText(newName);
+  registerCall.getArguments()[0]?.replaceWithText(new_node_name);
 
-  return { 
-    originalName: originalValue,
-    /**
-     * Already includes quotes
-     */
-    newName,
-    registerCall 
-  };
+  return registerCall;
 }
 
 /**
@@ -364,64 +353,84 @@ function updateNodeNameInRegistration(source: Node, identifier: string) {
  * @param script - The raw string of the node registration script
  * @returns
  */
-function transformNodeRegistrationScript(script: string, identifier: string) {
-  const project = getProject({ module: ModuleKind.CommonJS });
-  const source = project.createSourceFile(_temporary_filename, script);
-  const { registerCall, newName, originalName } = updateNodeNameInRegistration(source, identifier);
+function transformNodeRegistrationScript(
+  htmlContent: string,
+  identifier: string,
+  original_node_name: string,
+  new_node_name: string
+) {
+  const parsedHtml = parseHTML(htmlContent);
+  const scripts = parsedHtml.window.document.querySelectorAll('script');
 
-  /**
-   * Modifies the category of the node to be the value of identifier
-   */
-  const secondArgument = registerCall.getArguments()[1]?.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
-  const categoryProperty = secondArgument?.getProperty('category')
-    ?.asKind(SyntaxKind.PropertyAssignment)
-    ?.getInitializer();
-  const labelProperty = secondArgument?.getProperty('label')
-    ?.asKind(SyntaxKind.PropertyAssignment)
-    ?.getInitializer();
-
-  if (categoryProperty) {
-    categoryProperty.replaceWithText(`'${identifier}'`);
-  } else {
-    secondArgument?.addPropertyAssignment({
-      name: 'category',
-      initializer: `'${identifier}'`
-    });
-  }
-
-  if (labelProperty) {
-    /**
-     * If it's a function, we find and replace the content of the descendants
-     */
-    if (labelProperty.isKind(SyntaxKind.FunctionExpression)) {
-      const functionBody = labelProperty.getBody();
-      const identifiers = functionBody
-        .getDescendants()
-        .filter(node =>
-          node.isKind(SyntaxKind.StringLiteral) ||
-          node.isKind(SyntaxKind.Identifier)
-        );
-
-      for (const node of identifiers) {
-        const text = node.getText().replaceAll(/['"]/g, '');
-        if (text === originalName) {
-          node.replaceWithText(newName);
-        }
+  for (const element of scripts) {
+    for (const attribute of element.attributes) {
+      if (attribute.value === original_node_name) {
+        attribute.value = new_node_name.replaceAll(/['"]/g, '');
       }
-    } else {
-      /**
-       * Replace the value directly if it's not a function.
-       */
-      labelProperty.replaceWithText(newName);
     }
-  } else {
-    secondArgument?.addPropertyAssignment({
-      name: 'label',
-      initializer: newName
-    });
+
+    if (element.textContent?.includes('RED.nodes.registerType')) {
+      const project = getProject({ module: ModuleKind.CommonJS });
+      const source = project.createSourceFile(_temporary_filename, element.textContent);
+      const registerCall = updateNodeNameInRegistration(source, new_node_name);
+
+      /**
+       * Modifies the category of the node to be the value of identifier
+       */
+      const secondArgument = registerCall.getArguments()[1]?.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+      const categoryProperty = secondArgument?.getProperty('category')
+        ?.asKind(SyntaxKind.PropertyAssignment)
+        ?.getInitializer();
+      const labelProperty = secondArgument?.getProperty('label')
+        ?.asKind(SyntaxKind.PropertyAssignment)
+        ?.getInitializer();
+
+      if (categoryProperty) {
+        categoryProperty.replaceWithText(`'${identifier}'`);
+      } else {
+        secondArgument?.addPropertyAssignment({
+          name: 'category',
+          initializer: `'${identifier}'`
+        });
+      }
+
+      if (labelProperty) {
+        /**
+         * If it's a function, we find and replace the content of the descendants
+         */
+        if (labelProperty.isKind(SyntaxKind.FunctionExpression)) {
+          const functionBody = labelProperty.getBody();
+          const identifiers = functionBody
+            .getDescendants()
+            .filter(node =>
+              node.isKind(SyntaxKind.StringLiteral)
+              || node.isKind(SyntaxKind.Identifier)
+            );
+
+          for (const node of identifiers) {
+            const text = node.getText().replaceAll(/['"]/g, '');
+            if (text === original_node_name) {
+              node.replaceWithText(new_node_name);
+            }
+          }
+        } else {
+          /**
+           * Replace the value directly if it's not a function.
+           */
+          labelProperty.replaceWithText(new_node_name);
+        }
+      } else {
+        secondArgument?.addPropertyAssignment({
+          name: 'label',
+          initializer: new_node_name
+        });
+      }
+
+      element.textContent = source.getFullText();
+    }
   }
 
-  return source.getFullText();
+  return parsedHtml.document.toString();
 }
 
 /**
@@ -463,9 +472,18 @@ export function transformNodeDefinition(
   identifier = 'blockchain'
 ) {
   /**
-   * Updates the name in the node itself
+   * Updates the references in the package.json object
    */
-  updateNodeNameInRegistration(cjs_exports, identifier);
+  let newName = `${node}-${identifier}`;
+  node_defs[newName] = addSuffixToFileName(node_defs[node]!, identifier);
+  new_node_names.set(node, newName);
+  delete node_defs[node];
+  newName = `'${newName}'`;
+
+  /**
+   * Updates the name in the node .js file
+   */
+  updateNodeNameInRegistration(cjs_exports, newName);
   writeASTToFile(sourceAst, addSuffixToFileName(sourcePath, identifier));
   rmSync(sourcePath, { force: true });
 
@@ -473,30 +491,16 @@ export function transformNodeDefinition(
    * Updates the HTML definition of the node
    */
   const nodeHTMLDefinitionPath = sourcePath.replace('.js', '.html');
-  const htmlDefinition = extractDefinitionFromHTML(nodeHTMLDefinitionPath);
+  const htmlDefinition = readTextFile(nodeHTMLDefinitionPath);
 
-  if (!htmlDefinition.htmlContent || !htmlDefinition.script) {
-    throw new Error('No HTML definition found');
-  }
-
-  const newScriptDefinition = transformNodeRegistrationScript(htmlDefinition.script, identifier);
-  writeModifiedHTML({
-    originalContents: htmlDefinition.htmlContent,
-    originalScript: htmlDefinition.script,
-    newScript: newScriptDefinition,
-    htmlPath: addSuffixToFileName(nodeHTMLDefinitionPath, identifier)
-  });
+  const newHtml = transformNodeRegistrationScript(htmlDefinition, identifier, node, newName);
+  writeFileSync(addSuffixToFileName(nodeHTMLDefinitionPath, identifier), newHtml);
   rmSync(nodeHTMLDefinitionPath, { force: true });
-
-  /**
-   * Updates the references in the package.json object
-   */
-  const newKey = `${node}-${identifier}`;
-  node_defs[newKey] = addSuffixToFileName(node_defs[node]!, identifier);
-  new_node_names.set(node, newKey);
-  delete node_defs[node];
 }
 
+/**
+ * The common catch block for fetch requests inside the node's logic
+ */
 function writeFetchCatchBlock(writer: CodeBlockWriter) {
   writer.write('catch (e)');
   writer.block(() => {
@@ -505,6 +509,10 @@ function writeFetchCatchBlock(writer: CodeBlockWriter) {
   });
 };
 
+/**
+ * Writes all the logic to connect a node with our blockchain
+ * middleware
+ */
 export function connectNodeWithBlockchain(
   source: Node,
   packageName: string,
@@ -515,7 +523,7 @@ export function connectNodeWithBlockchain(
     stmt.remove();
   }
 
-  inners.addStatements(writer => {
+  inners.addStatements((writer) => {
     writer.writeLine('RED.nodes.createNode(this, config);');
     writer.newLine();
   });

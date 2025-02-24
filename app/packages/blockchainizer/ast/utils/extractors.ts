@@ -1,5 +1,4 @@
 import { BinaryExpression, SourceFile, SyntaxKind, type Node } from 'ts-morph';
-import { readTextFile } from './base.ts';
 
 /**
  * Extracts the module.exports from the source file
@@ -92,22 +91,5 @@ export function extractLogic(source: Node) {
   return {
     body: result,
     handlers
-  };
-}
-
-/**
- * Extracts the registration script from the HTML file.
- */
-export function extractDefinitionFromHTML(htmlPath: string) {
-  const htmlContent = readTextFile(htmlPath);
-  const scriptMatch = /<script.*?>([\s\S]*?)<\/script>/i.exec(htmlContent);
-
-  if (!scriptMatch) {
-    throw new Error('No <script> tag with the node definition found');
-  }
-
-  return {
-    htmlContent,
-    script: scriptMatch.find(v => v.includes('RED.nodes.registerType'))
   };
 }
