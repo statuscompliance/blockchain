@@ -322,7 +322,9 @@ export function removeREDStatements(source: Node): void {
 
 /**
  * Updates the name of the node in the `RED.nodes.registerType` call.
- * @returns - The AST of the `RED.nodes.registerType` call
+ * @returns `[registerCall]` - The AST of the `RED.nodes.registerType` call
+ * @returns `[newName]`- The new name of the node
+ * @returns `[originalName]` - The original name of the node
  */
 function updateNodeNameInRegistration(source: Node, identifier: string) {
   const registerCall = source
@@ -342,9 +344,17 @@ function updateNodeNameInRegistration(source: Node, identifier: string) {
    */
   const firstArgument = registerCall.getArguments()[0];
   const originalValue = firstArgument!.getText().replaceAll(/['"]/g, '');
-  firstArgument?.replaceWithText(`'${originalValue}-${identifier}'`);
+  const newName = `'${originalValue}-${identifier}'`;
+  firstArgument?.replaceWithText(newName);
 
-  return registerCall;
+  return { 
+    originalName: originalValue,
+    /**
+     * Already includes quotes
+     */
+    newName,
+    registerCall 
+  };
 }
 
 /**
@@ -357,13 +367,16 @@ function updateNodeNameInRegistration(source: Node, identifier: string) {
 function transformNodeRegistrationScript(script: string, identifier: string) {
   const project = getProject({ module: ModuleKind.CommonJS });
   const source = project.createSourceFile(_temporary_filename, script);
-  const registerCall = updateNodeNameInRegistration(source, identifier);
+  const { registerCall, newName, originalName } = updateNodeNameInRegistration(source, identifier);
 
   /**
    * Modifies the category of the node to be the value of identifier
    */
   const secondArgument = registerCall.getArguments()[1]?.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
   const categoryProperty = secondArgument?.getProperty('category')
+    ?.asKind(SyntaxKind.PropertyAssignment)
+    ?.getInitializer();
+  const labelProperty = secondArgument?.getProperty('label')
     ?.asKind(SyntaxKind.PropertyAssignment)
     ?.getInitializer();
 
@@ -373,6 +386,38 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
     secondArgument?.addPropertyAssignment({
       name: 'category',
       initializer: `'${identifier}'`
+    });
+  }
+
+  if (labelProperty) {
+    /**
+     * If it's a function, we find and replace the content of the descendants
+     */
+    if (labelProperty.isKind(SyntaxKind.FunctionExpression)) {
+      const functionBody = labelProperty.getBody();
+      const identifiers = functionBody
+        .getDescendants()
+        .filter(node =>
+          node.isKind(SyntaxKind.StringLiteral) ||
+          node.isKind(SyntaxKind.Identifier)
+        );
+
+      for (const node of identifiers) {
+        const text = node.getText().replaceAll(/['"]/g, '');
+        if (text === originalName) {
+          node.replaceWithText(newName);
+        }
+      }
+    } else {
+      /**
+       * Replace the value directly if it's not a function.
+       */
+      labelProperty.replaceWithText(newName);
+    }
+  } else {
+    secondArgument?.addPropertyAssignment({
+      name: 'label',
+      initializer: newName
     });
   }
 
