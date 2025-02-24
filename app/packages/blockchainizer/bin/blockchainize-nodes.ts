@@ -1,12 +1,12 @@
 #!/usr/bin/env -S NODE_NO_WARNINGS=1 node --experimental-strip-types
 import { spawnSync } from 'node:child_process';
-import { basename, join, parse } from 'node:path';
+import { join, parse } from 'node:path';
 import { logger } from '@statuscompliance/blockchain-shared/logger';
-import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync } from 'node:fs';
+import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { extract } from 'tar';
 import { nodeToAST, getBaseChaincodeAST, writeASTToFile } from '../ast/utils/base.ts';
 import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
-import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, transformNodeDefinition, transformLogic, addSuffixToFileName, connectNodeWithBlockchain, ensureEnvironmentConsistency } from '../ast/utils/transforms.ts';
+import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, transformNodeDefinition, transformLogic, connectNodeWithBlockchain, ensureEnvironmentConsistency } from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
 import { mkdir } from 'node:fs/promises';
@@ -117,6 +117,7 @@ for (const file of packages) {
     const sanitizedPackageName = packageName.replaceAll('@', '').replaceAll('/', '-');
     const outputPath = join(baseOutputPath, sanitizedPackageName);
     const nodeDefinitions = packageJson['node-red']?.nodes;
+    const nodeNames = new Map<string, string>();
 
     logger.info(`Converting nodes from package ${packageName}...`);
     packageJson.name = `${packageName}_${suffix}`;
@@ -133,14 +134,6 @@ for (const file of packages) {
 
     for (const node in nodeDefinitions) {
       logger.info(`|- [${packageName}] Converting node '${node}'...`);
-
-      /**
-       * Renames the node file with the appropiate suffix
-       */
-      const newNodePath = addSuffixToFileName(nodeDefinitions[node]!, suffix);
-      const newNodeNameWithoutExtension = basename(newNodePath).split('.')[0];
-
-      nodeDefinitions[newNodeNameWithoutExtension!] = newNodePath;
 
       try {
         const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]!);
@@ -161,6 +154,7 @@ for (const file of packages) {
           innerExportsAst,
           node,
           nodeDefinitions,
+          nodeNames,
           suffix
         );
 
@@ -216,6 +210,23 @@ for (const file of packages) {
      * Write the nodered nodes' package.json file
      */
     writeFileSync(join(_TMP_packagePath, 'package.json'), stringify(packageJson));
+
+    /**
+     * Update the names in flows.json file as well
+     */
+    const flowsPath = join(process.cwd(), _TMP_packagePath, 'flows.json');
+
+    if (existsSync(flowsPath)) {
+      const flowsJson = JSON.parse(readFileSync(flowsPath, 'utf8'));
+
+      for (const object of flowsJson) {
+        if (nodeNames.has(object.type)) {
+          object.type = nodeNames.get(object.type)!;
+        }
+      }
+
+      writeFileSync(flowsPath, stringify(flowsJson));
+    }
 
     /**
      * After all the transformations are done, we pack and prepare the

@@ -386,10 +386,10 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
  * @param suffix - The suffix to append to the file name before the extension
  * @returns The new file path with the suffix added to the file name
  * @example
- * // returns "/path/to/file-suffix.ts"
+ * returns "/path/to/file-suffix.ts"
  * addSuffixToFileName("/path/to/file.ts", "-suffix")
  */
-export function addSuffixToFileName(filePath: string, suffix: string) {
+function addSuffixToFileName(filePath: string, suffix: string) {
   const directory = dirname(filePath);
   const extension = extname(filePath);
   const baseName = basename(filePath, extension);
@@ -414,6 +414,7 @@ export function transformNodeDefinition(
   cjs_exports: Node,
   node: string,
   node_defs: Record<string, string>,
+  new_node_names: Map<string, string>,
   identifier = 'blockchain'
 ) {
   /**
@@ -445,7 +446,9 @@ export function transformNodeDefinition(
   /**
    * Updates the references in the package.json object
    */
-  node_defs[`${node}-${identifier}`] = addSuffixToFileName(node_defs[node]!, identifier);
+  const newKey = `${node}-${identifier}`;
+  node_defs[newKey] = addSuffixToFileName(node_defs[node]!, identifier);
+  new_node_names.set(node, newKey);
   delete node_defs[node];
 }
 
