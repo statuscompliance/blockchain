@@ -96,12 +96,12 @@ export function hyperledgerActions(fastify: FastifyInstance) {
   },
   async (
     request: FastifyRequest<{
-      Params: CommonChaincodeQueryParameters;
+      Params: CommonChaincodeQueryParameters & { id: string };
       Body: { msg: unknown; config: unknown };
     }>,
     reply: FastifyReply
   ) => {
-    const { node, pkg } = request.params;
+    const { node, pkg, id } = request.params;
 
     if (!runningChaincodes.get(pkg)?.has(node)) {
       reply.code(404).send();
@@ -109,7 +109,7 @@ export function hyperledgerActions(fastify: FastifyInstance) {
     }
 
     try {
-      return await transaction(pkg, node, request.body);
+      return await transaction(pkg, node, request.body, id);
     } catch {
       reply.code(500).send();
       return;

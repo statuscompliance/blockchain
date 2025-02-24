@@ -65,13 +65,19 @@ export async function listChaincodes() {
     .filter(Boolean);
 }
 
-export async function transaction(package_: string, name: string, arguments_: { msg: unknown; config: unknown }) {
+export async function transaction(
+  package_: string,
+  name: string,
+  arguments_: { msg: unknown; config: unknown },
+  instance_id: string
+) {
   const { network } = getLedgerGateway();
   const contract = network.getContract(getChaincodeName(package_, name));
   const result = await contract.submitTransaction(
     'setArgsAndRun',
     JSON.stringify(arguments_.msg),
-    JSON.stringify(arguments_.config)
+    JSON.stringify(arguments_.config),
+    instance_id
   );
   return JSON.parse(Buffer.from(result).toString('utf8'));
 }

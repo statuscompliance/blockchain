@@ -154,13 +154,17 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
       },
       {
         name: 'config'
+      },
+      {
+        name: 'instance_id'
       }
     ],
     statements: (writer) => {
       writer.writeLine('this._msg = JSON.parse(msg);');
       writer.writeLine('this._config = JSON.parse(config);');
       writer.writeLine('this._run();');
-      writer.writeLine(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(this._result)));`);
+      writer.writeLine(`const new_state = { result: this._result, instance_id };`);
+      writer.writeLine(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(new_state)));`);
       writer.writeLine('return this._result;');
     }
   });
