@@ -478,7 +478,7 @@ export function connectNodeWithBlockchain(
     declarationKind: VariableDeclarationKind.Const,
     declarations: [{
       name: 'PACKAGE_NAME',
-      initializer: `'${packageName.replaceAll('@', '').replaceAll(' / ', ' - ')}'`
+      initializer: `'${packageName}'`
     },
     {
       name: 'NODE_NAME',

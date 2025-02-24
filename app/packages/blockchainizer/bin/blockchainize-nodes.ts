@@ -114,7 +114,8 @@ for (const file of packages) {
       readFileSync(join(process.cwd(), _TMP_packagePath, 'package.json'), 'utf8')
     );
     const packageName = packageJson.name ?? file.replace('.tgz', '');
-    const outputPath = join(baseOutputPath, packageName.replaceAll('@', '').replaceAll('/', '-'));
+    const sanitizedPackageName = packageName.replaceAll('@', '').replaceAll('/', '-');
+    const outputPath = join(baseOutputPath, sanitizedPackageName);
     const nodeDefinitions = packageJson['node-red']?.nodes;
 
     logger.info(`Converting nodes from package ${packageName}...`);
@@ -202,7 +203,7 @@ for (const file of packages) {
         /**
          * Node logic
          */
-        connectNodeWithBlockchain(contents, packageName, node);
+        connectNodeWithBlockchain(contents, sanitizedPackageName, node);
         writeASTToFile(sourceAst);
         delete nodeDefinitions[node];
       } catch (error) {
