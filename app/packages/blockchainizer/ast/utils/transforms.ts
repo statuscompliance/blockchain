@@ -470,6 +470,10 @@ export function connectNodeWithBlockchain(
     stmt.remove();
   }
 
+  inners.addStatements(writer => {
+    writer.writeLine('RED.nodes.createNode(this, config);');
+    writer.newLine();
+  });
   inners.addVariableStatement({
     declarationKind: VariableDeclarationKind.Let,
     declarations: [{
@@ -493,7 +497,7 @@ export function connectNodeWithBlockchain(
     },
     {
       name: 'INSTANCE_ID',
-      initializer: 'config.id'
+      initializer: 'this.id'
     },
     {
       name: 'START_BLOCKCHAIN',
