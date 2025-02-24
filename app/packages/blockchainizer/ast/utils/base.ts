@@ -119,9 +119,9 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     name: '_run',
     scope: Scope.Private,
     initializer: (writer) => {
-      writer.write('() =>');
+      writer.writeLine('() =>');
       writer.block(() => {
-        writer.write('this._result = this._internalLogic(this._msg, this._config);');
+        writer.writeLine('this._result = this._internalLogic(this._msg, this._config);');
       });
     }
   });
@@ -130,11 +130,11 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
     name: 'dispose',
     scope: Scope.Public,
     initializer: (writer) => {
-      writer.write('() =>');
+      writer.writeLine('() =>');
       writer.block(() => {
-        writer.write('for (const cleanup of this._cleanups)');
+        writer.writeLine('for (const cleanup of this._cleanups)');
         writer.block(() => {
-          writer.write('cleanup(true, () => {});');
+          writer.writeLine('cleanup(true, () => {});');
         });
       });
     }
@@ -157,15 +157,11 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
       }
     ],
     statements: (writer) => {
-      writer.write('this._msg = JSON.parse(msg);');
-      writer.newLine();
-      writer.write('this._config = JSON.parse(config);');
-      writer.newLine();
-      writer.write('this._run();');
-      writer.newLine();
-      writer.write(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(this._result)));`);
-      writer.newLine();
-      writer.write('return this._result;');
+      writer.writeLine('this._msg = JSON.parse(msg);');
+      writer.writeLine('this._config = JSON.parse(config);');
+      writer.writeLine('this._run();');
+      writer.writeLine(`await ctx.stub.putState('result', Buffer.from(JSON.stringify(this._result)));`);
+      writer.writeLine('return this._result;');
     }
   });
 
@@ -179,15 +175,12 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
       }
     ],
     statements: (writer) => {
-    //
-      writer.write(`const resultAsBytes = await ctx.stub.getState('result');`);
-      writer.newLine();
-      writer.write(`if (!resultAsBytes || resultAsBytes.length === 0)`);
-      writer.newLine();
+      writer.writeLine(`const resultAsBytes = await ctx.stub.getState('result');`);
+      writer.writeLine(`if (!resultAsBytes || resultAsBytes.length === 0)`);
       writer.block(() => {
-        writer.write(`throw new Error('Result does not exist');`);
+        writer.writeLine(`throw new Error('Result does not exist');`);
       });
-      writer.write(`return JSON.parse(resultAsBytes.toString());`);
+      writer.writeLine(`return JSON.parse(resultAsBytes.toString());`);
     }
   });
 

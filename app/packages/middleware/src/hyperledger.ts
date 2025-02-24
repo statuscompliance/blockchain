@@ -16,7 +16,7 @@ export async function waitProcess(...arguments_: [string, string[]]): Promise<st
       if (code === 0) {
         resolve(output);
       } else {
-        reject(new Error(`Process exited with code ${code ?? -1}`));
+        reject(new Error(`Process exited with code ${String(code ?? -1)}`));
       }
     });
 
