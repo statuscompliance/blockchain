@@ -43,6 +43,7 @@ export const getBaseConfig = (base_directory = import.meta.dirname) => ([
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-dynamic-delete': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
       'unicorn/consistent-function-scoping': ['error', { checkArrowFunctions: false }],
       'unicorn/no-await-expression-member': 'off'
     }

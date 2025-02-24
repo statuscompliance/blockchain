@@ -33,31 +33,33 @@ function transformFunctionStatements(statement: Node): void {
       const callee = expression.getExpression();
       const arguments_ = expression.getArguments()[0]?.getText();
 
-      switch (callee.getText()) {
-        case 'this.done':
-        case 'this.send': {
-          replaceNodeSafely(expression, `return ${arguments_};`);
-          return;
-        }
-        case 'this.error': {
-          replaceNodeSafely(expression, `console.error(${arguments_});`);
-          return;
-        }
-        case 'this.warn': {
-          replaceNodeSafely(expression, `console.warn(${arguments_});`);
-          return;
-        }
-        case 'this.log': {
-          replaceNodeSafely(expression, `console.log(${arguments_});`);
-          return;
-        }
-        case 'this.debug': {
-          replaceNodeSafely(expression, `console.debug(${arguments_});`);
-          return;
-        }
-        case 'this.trace': {
-          replaceNodeSafely(expression, `console.trace(${arguments_});`);
-          return;
+      if (arguments_) {
+        switch (callee.getText()) {
+          case 'this.done':
+          case 'this.send': {
+            replaceNodeSafely(expression, `return ${arguments_};`);
+            return;
+          }
+          case 'this.error': {
+            replaceNodeSafely(expression, `console.error(${arguments_});`);
+            return;
+          }
+          case 'this.warn': {
+            replaceNodeSafely(expression, `console.warn(${arguments_});`);
+            return;
+          }
+          case 'this.log': {
+            replaceNodeSafely(expression, `console.log(${arguments_});`);
+            return;
+          }
+          case 'this.debug': {
+            replaceNodeSafely(expression, `console.debug(${arguments_});`);
+            return;
+          }
+          case 'this.trace': {
+            replaceNodeSafely(expression, `console.trace(${arguments_});`);
+            return;
+          }
         }
       }
     }
@@ -87,7 +89,7 @@ export function addNodeLogicToChaincode(
   const statementsToAppend: (Node | string)[] = [];
 
   for (const handler in extractedLogic.handlers) {
-    for (const node of extractedLogic.handlers[handler]) {
+    for (const node of extractedLogic.handlers[handler]!) {
       const inner_function_statements = node
         .asKind(SyntaxKind.FunctionExpression)
         ?.getBody()
@@ -147,7 +149,7 @@ export function convertRequiresToImports(cjsAST: SourceFile, chaincode: IBaseCha
 
     const modulePath = requireCall
       .asKindOrThrow(SyntaxKind.CallExpression)
-      .getArguments()[0]
+      .getArguments()[0]!
       .getText()
       .replaceAll(/['"]/g, '');
     const variableName = declaration.getName().replaceAll(':', ' as '); // Handle aliases
@@ -339,8 +341,8 @@ function updateNodeNameInRegistration(source: Node, identifier: string) {
    * Modifies the argument to append the identifier to the node name
    */
   const firstArgument = registerCall.getArguments()[0];
-  const originalValue = firstArgument.getText().replaceAll(/['"]/g, '');
-  firstArgument.replaceWithText(`'${originalValue}-${identifier}'`);
+  const originalValue = firstArgument!.getText().replaceAll(/['"]/g, '');
+  firstArgument?.replaceWithText(`'${originalValue}-${identifier}'`);
 
   return registerCall;
 }
@@ -360,15 +362,15 @@ function transformNodeRegistrationScript(script: string, identifier: string) {
   /**
    * Modifies the category of the node to be the value of identifier
    */
-  const secondArgument = registerCall.getArguments()[1].asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
-  const categoryProperty = secondArgument.getProperty('category')
+  const secondArgument = registerCall.getArguments()[1]?.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+  const categoryProperty = secondArgument?.getProperty('category')
     ?.asKind(SyntaxKind.PropertyAssignment)
     ?.getInitializer();
 
   if (categoryProperty) {
     categoryProperty.replaceWithText(`'${identifier}'`);
   } else {
-    secondArgument.addPropertyAssignment({
+    secondArgument?.addPropertyAssignment({
       name: 'category',
       initializer: `'${identifier}'`
     });
@@ -443,7 +445,7 @@ export function transformNodeDefinition(
   /**
    * Updates the references in the package.json object
    */
-  node_defs[`${node}-${identifier}`] = addSuffixToFileName(node_defs[node], identifier);
+  node_defs[`${node}-${identifier}`] = addSuffixToFileName(node_defs[node]!, identifier);
   delete node_defs[node];
 }
 

@@ -30,7 +30,7 @@ type PackageJsonWithNodeRedDefinitions = PackageJson & {
 /**
  * Show help if no arguments are given
  */
-if (arguments_.length === 0 || arguments_[0].trim() === '--help' || arguments_[0].trim() === '-h') {
+if (arguments_.length === 0 || arguments_[0]?.trim() === '--help' || arguments_[0]?.trim() === '-h') {
   logger.info([
     'Given an npm package that contains node-red nodes, this CLI tool converts them',
     'to be compatible with the blockchain layer of STATUS, so their logic runs in the blockchain instead of node-red.',
@@ -118,13 +118,12 @@ for (const file of packages) {
     const nodeDefinitions = packageJson['node-red']?.nodes;
 
     logger.info(`Converting nodes from package ${packageName}...`);
+    packageJson.name = `${packageName}_${suffix}`;
 
     if (!nodeDefinitions) {
       logger.error('No nodes found in the provided package');
       process.exit(1);
     }
-
-    packageJson.name = `${packageName}_${suffix}`;
 
     /**
      * Conversion process
@@ -137,13 +136,13 @@ for (const file of packages) {
       /**
        * Renames the node file with the appropiate suffix
        */
-      const newNodePath = addSuffixToFileName(nodeDefinitions[node], suffix);
+      const newNodePath = addSuffixToFileName(nodeDefinitions[node]!, suffix);
       const newNodeNameWithoutExtension = basename(newNodePath).split('.')[0];
 
-      nodeDefinitions[newNodeNameWithoutExtension] = newNodePath;
+      nodeDefinitions[newNodeNameWithoutExtension!] = newNodePath;
 
       try {
-        const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]);
+        const sourcePath = join(process.cwd(), _TMP_PATH, 'package', nodeDefinitions[node]!);
         const targetAst = getBaseChaincodeAST();
         const sourceAst = nodeToAST(sourcePath, {
           module: ModuleKind.CommonJS,

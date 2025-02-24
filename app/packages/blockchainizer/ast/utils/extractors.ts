@@ -65,13 +65,13 @@ function getHandlers(descendants: Node[]) {
 
     if (callExpr) {
       const arguments_ = callExpr.getArguments();
-      const eventName = arguments_[0].getText().replaceAll(/['"]/g, '');
+      const eventName = arguments_[0]!.getText().replaceAll(/['"]/g, '');
 
       if (!(eventName in handlers)) {
         handlers[eventName] = [];
       }
 
-      handlers[eventName].push(arguments_[1]);
+      handlers[eventName]!.push(arguments_[1]!);
     }
   }
 
