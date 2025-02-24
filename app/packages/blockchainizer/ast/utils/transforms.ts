@@ -1,5 +1,5 @@
 import { basename, dirname, extname, join } from 'node:path';
-import { CodeBlockWriter, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclarationKind } from 'ts-morph';
+import { CodeBlockWriter, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclaration, VariableDeclarationKind } from 'ts-morph';
 import { type IBaseChaincodeAST, getProject, writeModifiedHTML, writeASTToFile } from './base.ts';
 import { extractDefinitionFromHTML, extractLogic } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
@@ -148,8 +148,9 @@ export function convertRequiresToImports(cjsAST: SourceFile, chaincode: IBaseCha
     const modulePath = requireCall
       .asKindOrThrow(SyntaxKind.CallExpression)
       .getArguments()[0]
-      .getText().replaceAll(/['"]/g, '');
-    const variableName = declaration.getName();
+      .getText()
+      .replaceAll(/['"]/g, '');
+    const variableName = declaration.getName().replaceAll(':', ' as '); // Handle aliases
 
     chaincode.source.addImportDeclaration({
       moduleSpecifier: modulePath,
