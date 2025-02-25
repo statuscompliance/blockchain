@@ -430,6 +430,11 @@ function transformNodeRegistrationScript(
     }
   }
 
+  /**
+   * This is no the standard Document interface, but linkedom's implementation,
+   * but the rule is not aware of that.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   return parsedHtml.document.toString();
 }
 
@@ -505,7 +510,6 @@ function writeFetchCatchBlock(writer: CodeBlockWriter) {
   writer.write('catch (e)');
   writer.block(() => {
     writer.writeLine('this.error(e);');
-    writer.writeLine('throw e;');
   });
 };
 
@@ -526,13 +530,6 @@ export function connectNodeWithBlockchain(
   inners.addStatements((writer) => {
     writer.writeLine('RED.nodes.createNode(this, config);');
     writer.newLine();
-  });
-  inners.addVariableStatement({
-    declarationKind: VariableDeclarationKind.Let,
-    declarations: [{
-      name: 'blockchain_started',
-      initializer: 'false'
-    }]
   });
   inners.addVariableStatement({
     declarationKind: VariableDeclarationKind.Const,
@@ -559,8 +556,7 @@ export function connectNodeWithBlockchain(
         writer.block(() => {
           writer.write('try');
           writer.block(() => {
-            writer.writeLine('await fetch(`${LEDGER_URL}/chaincode/up/${PACKAGE_NAME}/${NODE_NAME}`, { method: "POST" })');
-            writer.writeLine('blockchain_started = true;');
+            writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/up/${PACKAGE_NAME}/${NODE_NAME}`, { method: "POST" });');
           });
           writeFetchCatchBlock(writer);
         });
@@ -569,20 +565,27 @@ export function connectNodeWithBlockchain(
     ]
   });
   inners.appendWhitespace('\n');
+  inners.addVariableStatement({
+    declarationKind: VariableDeclarationKind.Let,
+    declarations: [{
+      name: 'promise_queue',
+      initializer: 'START_BLOCKCHAIN()'
+    }]
+  });
   inners.addStatements((writer) => {
-    writer.write('this.on("input", async (msg) =>');
+    writer.write('this.on("input", (msg) =>');
     writer.block(() => {
-      writer.write('if (!blockchain_started)');
+      writer.writeLine('const ops = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msg, config }) };');
+      writer.writeLine('promise_queue = promise_queue.then(async () =>');
       writer.block(() => {
-        writer.writeLine('await START_BLOCKCHAIN();');
+        writer.write('try');
+        writer.block(() => {
+          writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/transaction/${PACKAGE_NAME}/${NODE_NAME}/${INSTANCE_ID}`, ops);');
+          writer.writeLine('this.send(await response.json());');
+        });
+        writeFetchCatchBlock(writer);
       });
-      writer.writeLine('const ops = { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ msg, config }) };');
-      writer.write('try');
-      writer.block(() => {
-        writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/transaction/${PACKAGE_NAME}/${NODE_NAME}/${INSTANCE_ID}`, ops);');
-        writer.writeLine('this.send(await response.json());');
-      });
-      writeFetchCatchBlock(writer);
+      writer.write(');');
     });
     writer.write(');');
   });
