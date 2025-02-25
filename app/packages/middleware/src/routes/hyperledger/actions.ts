@@ -8,6 +8,7 @@ import {
   type CommonChaincodeQueryParameters
 } from '../../constants.ts';
 import { join } from 'node:path';
+import { logger } from '@statuscompliance/blockchain-shared/logger';
 
 export function hyperledgerActions(fastify: FastifyInstance) {
   fastify.post('/chaincode/up/:pkg/:node', {
@@ -64,8 +65,9 @@ export function hyperledgerActions(fastify: FastifyInstance) {
       } else {
         runningChaincodes.set(pkg, new Set([node]));
       }
-    } catch {
-      reply.code(500).send();
+    } catch (e) {
+      logger.error(e);
+      reply.code(500).send(e);
       return;
     }
 
@@ -110,8 +112,9 @@ export function hyperledgerActions(fastify: FastifyInstance) {
 
     try {
       return await transaction(pkg, node, request.body, id);
-    } catch {
-      reply.code(500).send();
+    } catch (e) {
+      logger.error(e);
+      reply.code(500).send(e);
       return;
     }
   });

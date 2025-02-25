@@ -4,6 +4,7 @@ import {
   commonChaincodeQueryParameters,
   runningChaincodes, type CommonChaincodeQueryParameters
 } from '../../constants.ts';
+import { logger } from '@statuscompliance/blockchain-shared/logger';
 
 export function hyperledgerQueries(fastify: FastifyInstance) {
   fastify.get('/list/chaincode', {
@@ -53,8 +54,9 @@ export function hyperledgerQueries(fastify: FastifyInstance) {
 
     try {
       await query(pkg, node);
-    } catch {
-      reply.code(500).send();
+    } catch (e) {
+      logger.error(e);
+      reply.code(500).send(e);
       return;
     }
 
