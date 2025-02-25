@@ -181,7 +181,7 @@ for (const file of packages) {
         delete packageJsonCopy['node-red'];
         writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), stringify(packageJsonCopy));
         // Adds the fabric-contract-api dependency to the chaincode's package.json
-        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api'], {
+        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api', 'fabric-shim'], {
           stdio: 'ignore',
           cwd: join(_TMP_chaincodeOutputPath, node)
         });
