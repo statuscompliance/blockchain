@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
+import { destr } from 'destr';
 import { channelName, getLedgerGateway, networkSh } from './constants.ts';
+import { logger } from '@statuscompliance/blockchain-shared/logger';
 
 export async function waitProcess(...arguments_: [string, string[]]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -79,7 +81,9 @@ export async function transaction(
     JSON.stringify(arguments_.config),
     instance_id
   );
-  return JSON.parse(Buffer.from(result).toString('utf8'));
+  const decodedResponse = Buffer.from(result).toString('utf8');
+  logger.log('Decoded response:', decodedResponse);
+  return destr(decodedResponse);
 }
 
 /**
