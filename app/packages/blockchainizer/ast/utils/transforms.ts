@@ -1,9 +1,18 @@
 import { basename, dirname, extname, join } from 'node:path';
-import { CodeBlockWriter, FunctionDeclaration, ModuleKind, Node, SourceFile, SyntaxKind, VariableDeclarationKind } from 'ts-morph';
-import { type IBaseChaincodeAST, getProject, writeASTToFile, readTextFile } from './base.ts';
+import { rmSync, writeFileSync } from 'node:fs';
+import {
+  CodeBlockWriter,
+  FunctionDeclaration,
+  FunctionExpression,
+  ModuleKind,
+  Node,
+  SourceFile,
+  SyntaxKind,
+  VariableDeclarationKind
+} from 'ts-morph';
+import { type IBaseChaincodeAST, getProject, writeASTToFile, readTextFile, getNodeStatementsWriters } from './base.ts';
 import { extractLogic } from './extractors.ts';
 import { _temporary_filename } from './shared.ts';
-import { rmSync, writeFileSync } from 'node:fs';
 import { parseHTML } from 'linkedom';
 
 /**
@@ -37,7 +46,8 @@ function transformFunctionStatements(statement: Node): void {
       if (arguments_) {
         switch (callee.getText()) {
           case 'this.done':
-          case 'this.send': {
+          case 'this.send':
+          case 'send': {
             replaceNodeSafely(expression, `return ${arguments_};`);
             return;
           }
@@ -71,10 +81,10 @@ function transformFunctionStatements(statement: Node): void {
  * Transforms the logic of the node that has been copied over to the chaincode
  * into chaincode-compatible logic, stripping all node-red specific syntax
  */
-export function transformLogic(source: Node): void {
+export function transformHandlerLogic(source: Node): void {
   for (const node of source.getDescendantStatements()) {
     if (!node.wasForgotten()) {
-      transformLogic(node);
+      transformHandlerLogic(node);
       transformFunctionStatements(node);
     }
   }
@@ -87,23 +97,28 @@ export function addNodeLogicToChaincode(
   targetAst: IBaseChaincodeAST,
   extractedLogic: ReturnType<typeof extractLogic>
 ): void {
-  const statementsToAppend: (Node | string)[] = [];
+  const inputHandlerStatements: Node[] = [];
+  const instanceStatements: string[] = [];
 
   for (const handler in extractedLogic.handlers) {
     for (const node of extractedLogic.handlers[handler]!) {
-      const inner_function_statements = node
-        .asKind(SyntaxKind.FunctionExpression)
-        ?.getBody()
+      const function_body = node.asKindOrThrow(SyntaxKind.FunctionExpression).getBody();
+      const inner_function_statements = function_body
         .asKindOrThrow(SyntaxKind.Block)
         .getStatements();
 
-      if (!inner_function_statements) {
-        throw new Error('Unexpected syntax found in a input handler');
-      }
-
       switch (handler) {
         case 'input': {
-          statementsToAppend.push(...inner_function_statements);
+          ensureParameterConsistency(
+            function_body,
+            node.asKindOrThrow(SyntaxKind.FunctionExpression),
+            { 0: 'msg', 1: 'send', 2: 'done' }
+          );
+          for (const statement of inner_function_statements) {
+            if (!statement.wasForgotten()) {
+              inputHandlerStatements.push(statement);
+            }
+          }
           break;
         }
         case 'close': {
@@ -117,7 +132,7 @@ export function addNodeLogicToChaincode(
             }
           });
           writer.write(');');
-          statementsToAppend.push(writer.toString());
+          instanceStatements.push(writer.toString());
           break;
         }
         default: {
@@ -127,10 +142,8 @@ export function addNodeLogicToChaincode(
     }
   }
 
-  targetAst.body.addStatements([
-    ...extractedLogic.body.map(n => n.getFullText().trim()),
-    ...statementsToAppend.map(n => typeof n === 'string' ? n : n.getFullText().trim())
-  ]);
+  targetAst.instance.insertStatements(0, [...extractedLogic.body.map(n => n.getFullText().trim()), ...instanceStatements]);
+  targetAst.input_handler.addStatements(inputHandlerStatements.map(n => n.getFullText().trim()));
 }
 
 /**
@@ -287,18 +300,23 @@ export function eraseReassignments(source: Node, variable: Node | string, overri
  * Also ensures the variables are named as expected everywhere (for instance, if `config`
  * was not being named `config` in any of the child nodes, it will be renamed to `config`).
  */
-export function ensureEnvironmentConsistency(body: Node, functionExpr: FunctionDeclaration): void {
-  const configParameter = functionExpr.getParameters()[0];
-  const newConfigName = 'config';
-  eraseReassignments(body, 'this');
+export function ensureParameterConsistency(
+  body: Node,
+  functionExpr: FunctionDeclaration | FunctionExpression,
+  newNames: Record<number, string>
+): void {
+  for (const parameterIndex in newNames) {
+    const parameter = functionExpr.getParameters()[parameterIndex];
+    const name = newNames[parameterIndex]!;
 
-  if (configParameter) {
-    configParameter.rename(newConfigName);
-    eraseReassignments(body, configParameter.getName(), newConfigName);
-  } else {
-    functionExpr.addParameter({
-      name: newConfigName
-    });
+    if (parameter) {
+      eraseReassignments(body, parameter.getName(), name);
+      parameter.rename(name);
+    } else {
+      functionExpr.addParameter({
+        name
+      });
+    }
   }
 }
 
@@ -504,16 +522,6 @@ export function transformNodeDefinition(
 }
 
 /**
- * The common catch block for fetch requests inside the node's logic
- */
-function writeFetchCatchBlock(writer: CodeBlockWriter) {
-  writer.write('catch (e)');
-  writer.block(() => {
-    writer.writeLine('this.error(e);');
-  });
-};
-
-/**
  * Writes all the logic to connect a node with our blockchain
  * middleware
  */
@@ -526,6 +534,8 @@ export function connectNodeWithBlockchain(
   for (const stmt of inners.getStatementsWithComments()) {
     stmt.remove();
   }
+
+  const { start, input_handler } = getNodeStatementsWriters();
 
   inners.addStatements((writer) => {
     writer.writeLine('RED.nodes.createNode(this, config);');
@@ -551,16 +561,7 @@ export function connectNodeWithBlockchain(
     },
     {
       name: 'START_BLOCKCHAIN',
-      initializer: (writer) => {
-        writer.write('async () =>');
-        writer.block(() => {
-          writer.write('try');
-          writer.block(() => {
-            writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/up/${PACKAGE_NAME}/${NODE_NAME}`, { method: "POST" });');
-          });
-          writeFetchCatchBlock(writer);
-        });
-      }
+      initializer: start
     }
     ]
   });
@@ -572,21 +573,5 @@ export function connectNodeWithBlockchain(
       initializer: 'START_BLOCKCHAIN()'
     }]
   });
-  inners.addStatements((writer) => {
-    writer.write('this.on("input", (msg) =>');
-    writer.block(() => {
-      writer.writeLine('const ops = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msg, config }) };');
-      writer.writeLine('promise_queue = promise_queue.then(async () =>');
-      writer.block(() => {
-        writer.write('try');
-        writer.block(() => {
-          writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/transaction/${PACKAGE_NAME}/${NODE_NAME}/${INSTANCE_ID}`, ops);');
-          writer.writeLine('this.send(await response.json());');
-        });
-        writeFetchCatchBlock(writer);
-      });
-      writer.write(');');
-    });
-    writer.write(');');
-  });
+  inners.addStatements(input_handler);
 }

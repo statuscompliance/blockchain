@@ -16,7 +16,7 @@ export function extractModuleExports(source: SourceFile) {
  */
 export function extractNodeContents(cjs_exports: BinaryExpression) {
   const reject: () => never = (): never => {
-    throw new Error('The provided node-red file is in an incompatible format');
+    throw new Error('The provided node-red file is incompatible');
   };
   const functionExpression = cjs_exports
     .getRight()

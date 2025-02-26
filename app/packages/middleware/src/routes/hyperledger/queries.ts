@@ -4,7 +4,6 @@ import {
   commonChaincodeQueryParameters,
   runningChaincodes, type CommonChaincodeQueryParameters
 } from '../../constants.ts';
-import { logger } from '@statuscompliance/blockchain-shared/logger';
 
 export function hyperledgerQueries(fastify: FastifyInstance) {
   fastify.get('/list/chaincode', {
@@ -20,14 +19,7 @@ export function hyperledgerQueries(fastify: FastifyInstance) {
       }
     }
   },
-  async (
-    _request: FastifyRequest,
-    reply: FastifyReply
-  ) => {
-    const chaincodes = await listChaincodes();
-
-    reply.code(200).send(chaincodes);
-  });
+  async () => await listChaincodes());
 
   fastify.get('/chaincode/query/:pkg/:node', {
     schema: {
@@ -52,14 +44,6 @@ export function hyperledgerQueries(fastify: FastifyInstance) {
       return;
     }
 
-    try {
-      await query(pkg, node);
-    } catch (e) {
-      logger.error(e);
-      reply.code(500).send(e);
-      return;
-    }
-
-    reply.code(200).send();
+    await query(pkg, node);
   });
 }

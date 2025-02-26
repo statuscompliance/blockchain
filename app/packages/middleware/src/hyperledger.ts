@@ -70,15 +70,15 @@ export async function listChaincodes() {
 export async function transaction(
   package_: string,
   name: string,
-  arguments_: { msg: unknown; config: unknown },
+  method: 'initInstance' | 'runInstance',
+  payload: unknown,
   instance_id: string
 ) {
   const { network } = getLedgerGateway();
   const contract = network.getContract(getChaincodeName(package_, name));
   const result = await contract.submitTransaction(
-    'setArgsAndRun',
-    JSON.stringify(arguments_.msg),
-    JSON.stringify(arguments_.config),
+    method,
+    JSON.stringify(payload),
     instance_id
   );
   const decodedResponse = Buffer.from(result).toString('utf8');

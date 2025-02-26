@@ -7,6 +7,7 @@ import { Client, credentials as grpc_credentials } from '@grpc/grpc-js';
 export interface CommonChaincodeQueryParameters {
   pkg: string;
   node: string;
+  id: string;
 }
 
 const fabricPath = process.env.FABRIC_TOOLS_PATH ?? '/fabric';
@@ -16,6 +17,7 @@ const testNetworkPath = join(fabricPath, 'test-network');
 export const networkSh = join(testNetworkPath, 'network.sh');
 export const channelName = 'statuscompliance';
 export const runningChaincodes = new Map<string, Set<string>>();
+export const runningNodeInstances = new Set<string>();
 export const commonChaincodeQueryParameters = (additional: Record<string, unknown> = {}) => ({
   type: 'object',
   properties: {
@@ -26,6 +28,10 @@ export const commonChaincodeQueryParameters = (additional: Record<string, unknow
     node: {
       type: 'string',
       description: 'Name of the node to initialize transactions'
+    },
+    id: {
+      type: 'string',
+      description: 'Instance ID of the node'
     },
     ...additional
   },

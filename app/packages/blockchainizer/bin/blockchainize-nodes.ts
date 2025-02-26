@@ -4,9 +4,18 @@ import { join, parse } from 'node:path';
 import { logger } from '@statuscompliance/blockchain-shared/logger';
 import { globSync, mkdirSync, rmSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { extract } from 'tar';
-import { nodeToAST, getBaseChaincodeAST, writeASTToFile, readTextFile } from '../ast/utils/base.ts';
+import { nodeToAST, getBaseChaincodeAST, writeASTToFile, readTextFile, installPackages } from '../ast/utils/base.ts';
 import { extractLogic, extractModuleExports, extractNodeContents } from '../ast/utils/extractors.ts';
-import { addNodeLogicToChaincode, convertRequiresToImports, removeREDStatements, transformNodeDefinition, transformLogic, connectNodeWithBlockchain, ensureEnvironmentConsistency } from '../ast/utils/transforms.ts';
+import {
+  addNodeLogicToChaincode,
+  convertRequiresToImports,
+  removeREDStatements,
+  transformNodeDefinition,
+  connectNodeWithBlockchain,
+  ensureParameterConsistency,
+  eraseReassignments,
+  transformHandlerLogic
+} from '../ast/utils/transforms.ts';
 import { ModuleKind } from 'ts-morph';
 import type { PackageJson } from 'type-fest';
 import { mkdir } from 'node:fs/promises';
@@ -165,11 +174,12 @@ for (const file of packages) {
         const { contents, nodeDefinition } = extractNodeContents(innerExportsAst);
         convertRequiresToImports(sourceAst, targetAst);
         removeREDStatements(contents);
-        ensureEnvironmentConsistency(contents, nodeDefinition);
+        eraseReassignments(contents, 'this');
+        ensureParameterConsistency(contents, nodeDefinition, { 0: 'config' });
 
         const extractedLogic = extractLogic(contents);
         addNodeLogicToChaincode(targetAst, extractedLogic);
-        transformLogic(targetAst.body.getBodyOrThrow());
+        transformHandlerLogic(targetAst.input_handler.getBody());
         writeASTToFile(targetAst.source, join(_TMP_chaincodeOutputPath, node, `${node}.ts`), true);
 
         // Prepare the output directories' structure to match what Hyperledger expects for the chaincodes
@@ -180,16 +190,8 @@ for (const file of packages) {
         const packageJsonCopy = structuredClone(packageJson);
         delete packageJsonCopy['node-red'];
         writeFileSync(join(_TMP_chaincodeOutputPath, node, 'package.json'), stringify(packageJsonCopy));
-        // Adds the fabric-contract-api dependency to the chaincode's package.json
-        spawnSync('npm', ['install', '--package-lock-only', '--no-package-lock', '--ignore-scripts', 'fabric-contract-api', 'fabric-shim'], {
-          stdio: 'ignore',
-          cwd: join(_TMP_chaincodeOutputPath, node)
-        });
-        spawnSync('npm', ['pkg', 'set', 'scripts.start=set -x && fabric-chaincode-node start'], {
-          stdio: 'ignore',
-          cwd: join(_TMP_chaincodeOutputPath, node)
-        });
-        spawnSync('npm', ['pkg', 'set', 'main=dist/index.js'], {
+        installPackages(['destr', 'fabric-contract-api', 'fabric-shim'], join(_TMP_chaincodeOutputPath, node));
+        spawnSync('npm', ['pkg', 'set', 'scripts.start=fabric-chaincode-node start', 'main=dist/index.js'], {
           stdio: 'ignore',
           cwd: join(_TMP_chaincodeOutputPath, node)
         });
@@ -207,9 +209,10 @@ for (const file of packages) {
     }
 
     /**
-     * Write the nodered nodes' package.json file
+     * Write the nodered nodes' package.json file and prepares dependencies
      */
     writeFileSync(join(_TMP_packagePath, 'package.json'), stringify(packageJson));
+    installPackages(['destr'], _TMP_packagePath);
 
     /**
      * Update the names in flows.json file as well

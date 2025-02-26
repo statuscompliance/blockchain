@@ -5,27 +5,34 @@ import {
   chaincodePath,
   commonChaincodeQueryParameters,
   runningChaincodes,
+  runningNodeInstances,
   type CommonChaincodeQueryParameters
 } from '../../constants.ts';
 import { join } from 'node:path';
-import { logger } from '@statuscompliance/blockchain-shared/logger';
 
 export function hyperledgerActions(fastify: FastifyInstance) {
-  fastify.post('/chaincode/up/:pkg/:node', {
+  fastify.post('/chaincode/up/:pkg/:node/:id', {
     schema: {
       params: commonChaincodeQueryParameters(),
+      body: {
+        type: 'object'
+      },
       response: {
-        226: {
-          type: 'null',
-          description: 'The chaincode is already installed and running'
-        },
         200: {
           type: 'null',
           description: 'Chaincode installed successfully'
         },
+        226: {
+          type: 'null',
+          description: 'The chaincode is already installed and running'
+        },
         404: {
           type: 'null',
           description: 'Chaincode not found'
+        },
+        500: {
+          type: 'string',
+          description: 'Server error'
         }
       }
     }
@@ -33,30 +40,31 @@ export function hyperledgerActions(fastify: FastifyInstance) {
   async (
     request: FastifyRequest<{
       Params: CommonChaincodeQueryParameters;
+      Body: unknown;
     }>,
     reply: FastifyReply
   ) => {
-    const { node, pkg } = request.params;
+    const { node, pkg, id: instance_id } = request.params;
 
-    if (runningChaincodes.get(pkg)?.has(node)) {
+    if (runningNodeInstances.has(instance_id)) {
       reply.code(226).send();
       return;
     }
 
-    let found = '';
-    for await (const match of glob(
-      join('./**', pkg, '**', node, 'package.json'), { cwd: chaincodePath, withFileTypes: true }
-    )) {
-      found = match.parentPath;
-      break;
-    }
+    if (!runningChaincodes.get(pkg)?.has(node)) {
+      let found = '';
+      for await (const match of glob(
+        join('./**', pkg, '**', node, 'package.json'), { cwd: chaincodePath, withFileTypes: true }
+      )) {
+        found = match.parentPath;
+        break;
+      }
 
-    if (!found) {
-      reply.code(404).send();
-      return;
-    }
+      if (!found) {
+        reply.code(404).send();
+        return;
+      }
 
-    try {
       await deployChaincode(pkg, node, found);
 
       const runningChaincodeByPackage = runningChaincodes.get(pkg);
@@ -65,41 +73,40 @@ export function hyperledgerActions(fastify: FastifyInstance) {
       } else {
         runningChaincodes.set(pkg, new Set([node]));
       }
-    } catch (e) {
-      logger.error(e);
-      reply.code(500).send(e);
-      return;
     }
+
+    await transaction(pkg, node, 'initInstance', request.body, instance_id);
+    runningNodeInstances.add(instance_id);
 
     reply.code(200).send();
   });
 
   fastify.post('/chaincode/transaction/:pkg/:node/:id', {
     schema: {
-      params: commonChaincodeQueryParameters({
-        id: {
-          type: 'string',
-          description: 'Instance ID of the node'
-        }
-      }),
+      params: commonChaincodeQueryParameters(),
       body: {
-        type: 'object',
-        properties: {
-          msg: {
-            type: 'object'
-          },
-          config: {
-            type: 'object'
-          }
+        type: 'object'
+      },
+      response: {
+        200: {
+          type: 'object',
+          description: 'Chaincode response'
         },
-        required: ['msg', 'config']
+        404: {
+          type: 'null',
+          description: 'Chaincode not found'
+        },
+        500: {
+          type: 'string',
+          description: 'Server error'
+        }
       }
     }
   },
   async (
     request: FastifyRequest<{
-      Params: CommonChaincodeQueryParameters & { id: string };
-      Body: { msg: unknown; config: unknown };
+      Params: CommonChaincodeQueryParameters;
+      Body: unknown;
     }>,
     reply: FastifyReply
   ) => {
@@ -110,12 +117,6 @@ export function hyperledgerActions(fastify: FastifyInstance) {
       return;
     }
 
-    try {
-      return await transaction(pkg, node, request.body, id);
-    } catch (e) {
-      logger.error(e);
-      reply.code(500).send(e);
-      return;
-    }
+    return await transaction(pkg, node, 'runInstance', request.body, id);
   });
 }
