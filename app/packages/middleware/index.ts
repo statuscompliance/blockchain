@@ -15,6 +15,30 @@ await app.register(import('@fastify/swagger-ui'), {
   }
 });
 
+app.setErrorHandler((error, request, reply) => {
+  const statusCode = error.statusCode ?? 500;
+
+  if (error.validation) {
+    return reply.status(400).send({
+      error: 'Validation Error',
+      message: error.message,
+      details: error.validation
+    });
+  }
+
+  if (statusCode >= 500) {
+    logger.error(error);
+  } else if (statusCode >= 400) {
+    logger.warn(`${error.message} - ${request.method} ${request.url}`);
+  }
+
+  reply.status(statusCode).send({
+    error: error.name || 'Error',
+    message: error.message || 'An unexpected error occurred',
+    statusCode
+  });
+});
+
 app.register(routes);
 await app.ready();
 app.swagger();
