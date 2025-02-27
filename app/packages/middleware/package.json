@@ -18,7 +18,6 @@
     "@grpc/grpc-js": "1.12.6",
     "@hyperledger/fabric-gateway": "1.7.1",
     "@statuscompliance/blockchain-shared": "*",
-    "destr": "2.0.3",
     "fastify": "5.2.1"
   }
 }

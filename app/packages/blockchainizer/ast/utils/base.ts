@@ -143,6 +143,7 @@ export function getBaseChaincodeAST(className = 'Chaincode'): IBaseChaincodeAST 
         writer.write(');');
       });
       writer.write(')(config);');
+      writer.writeLine('return true');
     }
   });
 
@@ -270,7 +271,15 @@ export function getNodeStatementsWriters() {
         writer.write('try');
         writer.block(() => {
           writer.writeLine('const response = await fetch(`${LEDGER_URL}/chaincode/transaction/${PACKAGE_NAME}/${NODE_NAME}/${INSTANCE_ID}`, ops);');
-          writer.writeLine('this.send(await response.json());');
+          writer.writeLine('const text = await response.text();');
+          writer.writeLine('if (!response.ok)');
+          writer.block(() => {
+            writer.writeLine('console.error("Error on ledger response:", text);');
+          });
+          writer.writeLine('else');
+          writer.block(() => {
+            writer.writeLine('this.send(destr(text));');
+          });
         });
         writeFetchCatchBlock(writer);
       });

@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { destr } from 'destr';
 import { channelName, getLedgerGateway, networkSh } from './constants.ts';
 import { logger } from '@statuscompliance/blockchain-shared/logger';
 
@@ -81,9 +80,9 @@ export async function transaction(
     JSON.stringify(payload),
     instance_id
   );
-  const decodedResponse = Buffer.from(result).toString('utf8');
-  logger.log('Decoded response:', decodedResponse);
-  return destr(decodedResponse);
+  const decodedResult = Buffer.from(result).toString('utf8');
+  logger.log('Transaction result:', decodedResult);
+  return decodedResult;
 }
 
 /**
