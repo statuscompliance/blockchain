@@ -54,7 +54,9 @@ if (arguments_.length === 0 || arguments_[0]?.trim() === '--help' || arguments_[
     '· blockchainize-nodes ./my-nodes - \'my-nodes\' is a package that comes from a local folder',
     '· blockchainize-nodes mynodes-1.0.0.tgz - \'my-nodes\' comes from a tarball',
     '· blockchainize-nodes https://example.com/path/to/my-nodes.tgz - \'my-nodes\' is a package tarball from an HTTP URL',
-    '· blockchainize-nodes git+https://github.com/user/nodes.git - \'nodes\' is a package from a git repository'
+    '· blockchainize-nodes git+https://github.com/user/nodes.git - \'nodes\' is a package from a git repository',
+    '',
+    'See a full description of what an npm package is at https://docs.npmjs.com/cli/v11/commands/npm-install#description'
   ].join('\n')
   );
   process.exit(0);
