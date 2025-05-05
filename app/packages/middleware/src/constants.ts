@@ -85,9 +85,7 @@ export function getLedgerGateway() {
     process.on('uncaughtException', cleanup);
   }
 
-  if (!network) {
-    network = gateway.getNetwork(channelName);
-  }
+  network ??= gateway.getNetwork(channelName);
 
   return { gateway, network };
 }

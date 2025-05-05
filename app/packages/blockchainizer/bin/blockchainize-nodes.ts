@@ -200,7 +200,7 @@ for (const file of packages) {
          * Node logic
          */
         connectNodeWithBlockchain(contents, sanitizedPackageName, node);
-        sourceAst.insertStatements(0, "const destr = require('destr');");
+        sourceAst.insertStatements(0, 'const destr = require(\'destr\');');
         writeASTToFile(sourceAst);
         delete nodeDefinitions[node];
       } catch (error) {
