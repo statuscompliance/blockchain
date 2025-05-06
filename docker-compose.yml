@@ -4,7 +4,7 @@ services:
     container_name: ledger
     image: statuscompliance/blockchain
     privileged: true
-    ports:
-      - 3000:80
     volumes:
       - ./blockchain-conversion:/chaincodes
+    networks:
+      - nodered_network
