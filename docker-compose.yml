@@ -7,4 +7,4 @@ services:
     ports:
       - 3000:80
     volumes:
-      - ./app/packages/blockchainizer/blockchain-conversion:/chaincodes
+      - ./blockchain-conversion:/chaincodes
