@@ -52,12 +52,13 @@ trap cleanup EXIT
 SILENT=true cleanup
 rm -rf docker_images
 
-# Copy files from app to docker-build/.build, excluding those included in gitignore
-mkdir -p docker-build/.build
-(cd app && git ls-files --others --cached --exclude-standard) | sort -u | while read -r file; do
-  if [ -f "app/$file" ]; then
-    mkdir -p "docker-build/.build/$(dirname "$file")"
-    cp "app/$file" "docker-build/.build/$file"
+# Copy files from packages to docker-build/.build, excluding those included in gitignore
+mkdir -p docker-build/.build/packages
+cp package*.json docker-build/.build
+(cd packages && git ls-files --others --cached --exclude-standard) | sort -u | while read -r file; do
+  if [ -f "packages/$file" ]; then
+    mkdir -p "docker-build/.build/packages/$(dirname "$file")"
+    cp -r "packages/$file" "docker-build/.build/packages/$file"
   fi
 done
 
