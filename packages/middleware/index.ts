@@ -1,7 +1,7 @@
 import { logger } from '@statuscompliance/blockchain-shared/logger';
 import Fastify from 'fastify';
 import { routes } from './src/routes/index.ts';
-import { startChannel } from './src/hyperledger.ts';
+import { startChannel, startNetwork } from './src/hyperledger.ts';
 
 console.info('Starting status ledger...');
 
@@ -44,8 +44,14 @@ await app.ready();
 app.swagger();
 
 // Starts blockchain operations before listening to requests, ensuring it's done inside Docker only
+// hence, we assume that the middleware is always running inside a Docker container and when it's not
+// it's because we are running in development mode.
 if (process.env.DOCKER_VERSION) {
-  await startChannel();
+  try {
+    await startChannel();
+  } catch {
+    await startNetwork();
+  }
 }
 
 try {

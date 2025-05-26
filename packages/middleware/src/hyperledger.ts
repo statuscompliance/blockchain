@@ -31,8 +31,8 @@ export async function startChannel() {
   await waitProcess(networkSh, ['up', 'createChannel', '-c', channelName, '-s', 'couchdb']);
 }
 
-export async function stopChannel() {
-  await waitProcess(networkSh, ['down']);
+export async function startNetwork() {
+  await waitProcess(networkSh, ['up']);
 }
 
 function getChaincodeName(package_: string, name: string) {
