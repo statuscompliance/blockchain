@@ -21,6 +21,6 @@
   "dependencies": {
     "@statuscompliance/blockchain-shared": "*",
     "linkedom": "0.18.10",
-    "ts-morph": "25.0.1"
+    "ts-morph": "26.0.0"
   }
 }
