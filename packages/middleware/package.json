@@ -12,12 +12,12 @@
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
-    "@fastify/autoload": "6.3.0",
+    "@fastify/autoload": "6.3.1",
     "@fastify/swagger": "9.5.1",
-    "@fastify/swagger-ui": "5.2.2",
+    "@fastify/swagger-ui": "5.2.3",
     "@grpc/grpc-js": "1.13.4",
     "@hyperledger/fabric-gateway": "1.7.1",
     "@statuscompliance/blockchain-shared": "*",
-    "fastify": "5.3.3"
+    "fastify": "5.4.0"
   }
 }
