@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@statuscompliance/blockchain-shared": "*",
-    "linkedom": "0.18.10",
+    "linkedom": "0.18.11",
     "ts-morph": "26.0.0"
   }
 }
